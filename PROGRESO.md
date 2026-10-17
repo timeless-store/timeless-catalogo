@@ -61,7 +61,7 @@
 
 ## 5. Lo que viene
 
-- Hoja de Google propia del catálogo (archivo aparte) con la fórmula que marca agotado solo.
+- Productos desde una hoja de Google propia del catálogo (archivo aparte, sin costos). **Bloqueado hasta consultarlo con el chat del dashboard**: el Sheets de ventas es privado y no se lee desde afuera (regla del 17 de octubre). Por eso el agotado automático desde el stock tampoco se arma por ahora; mientras tanto, Alberto marca NO en `productos.csv` (me lo dice y lo cambio yo).
 - Contador de visitas (GoatCounter) y medir cuántos tocan "Cerrar pedido" y "Avísame cuando vuelva". Antes de anunciar, no ahora.
 - Banner / logo más profesional (cuando Alberto tenga el material actualizado).
 - Revisión de seguridad completa y quitar el `noindex` antes de anunciar.
@@ -70,7 +70,7 @@
 ## 6. Decisiones y avisos importantes
 
 - **Este repositorio es público.** No va nada interno del negocio (costos, márgenes, traspaso, enlaces del dashboard).
-- **La hoja del catálogo irá en un archivo de Google Sheets aparte**, no en el del dashboard.
+- **El Sheets de ventas es privado (regla fija del 17 de octubre de 2026):** nunca se publica ni se lee desde el catálogo.
 - **Instagram y TikTok** usan `timeless.store._` hasta que Alberto avise el cambio.
 - **Oferta sin fecha = permanente; fecha mal escrita = sin oferta** (también en las promos).
 - **El costo de envío del carrito es aproximado**; la página lo dice y el valor exacto se confirma por chat. Si el pedido lleva un producto con envío gratis, todo es gratis.

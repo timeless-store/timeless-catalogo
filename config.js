@@ -6,12 +6,12 @@
 
 const CATALOGO_CONFIG = {
 
-  // De dónde se leen los productos. Hoy: el archivo de prueba del repo.
-  // Cuando exista la pestaña nueva "Catálogo" en el Sheets, se publica como CSV
-  // (Archivo → Compartir → Publicar en la web → esa pestaña → .csv) y se pega
-  // aquí el enlace. No hay que tocar nada más.
+  // De dónde se leen los productos. Hoy: el archivo productos.csv de este repo.
   //
-  // 🚨 NUNCA pegar aquí el enlace de la pestaña "Stocks": tiene costos y márgenes.
+  // 🚨 REGLA FIJA: el Sheets "Timeless - Ventas e Inventario" es PRIVADO (costos,
+  // márgenes, gastos). Nunca se publica ni se lee desde aquí. Si algún día los
+  // productos salen de una hoja de Google, tendría que ser un archivo APARTE y
+  // sin costos, y antes se consulta con el chat del dashboard.
   CSV_PRODUCTOS: 'productos.csv',
 
   // Número de WhatsApp del negocio (el mismo del catálogo de Canva). Va con
