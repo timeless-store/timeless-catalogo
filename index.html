@@ -35,13 +35,19 @@
 </head>
 <body>
 
+<!-- Pantalla de carga: negro puro con el logo hasta que el catálogo esté listo.
+     Los estilos van aquí mismo para que se vea negra desde el primer instante. -->
+<div class="carga" id="carga" style="position:fixed;inset:0;z-index:100;background:#000;display:flex;align-items:center;justify-content:center">
+  <img src="img/logo-carga.png" alt="Timeless" style="width:min(62vw,340px);height:auto">
+</div>
+
 <header class="top">
   <!-- Franja de campañas (Cyber Wow, Black Friday…): se prende en config.js -->
   <div class="franja" id="franja" role="marquee" hidden></div>
   <div class="top-in">
     <a class="marca" href="#" id="marcaLink">
       <div class="eyebrow">Accesorios streetwear · Lima</div>
-      <div class="marca-nombre">Timeless Store</div>
+      <img class="marca-logo" src="img/logo-cabecera.png" alt="Timeless Store" width="268" height="120">
     </a>
     <a class="carrito-btn" href="#/carrito" aria-label="Ver carrito">
       Carrito <span class="carrito-num mono" id="carritoNum">0</span>
@@ -65,6 +71,8 @@
     <!-- Cuando haya anillos disponibles: "Cinturones, collares, pant chains, anillos y más" -->
     <h1>Cinturones, collares, pant chains y más</h1>
     <p>Elige lo que te guste, arma tu pedido, cotiza tu envío y lo coordinamos por WhatsApp o Instagram.</p>
+    <!-- Aparece solo cuando hay promos activas (promos.csv) -->
+    <div id="heroPromo"></div>
     <div class="hero-cta">
       <a class="btn btn-primario" href="#catalogo" data-scroll="catalogo">Ver catálogo</a>
       <a class="btn" id="heroWa" href="#" target="_blank" rel="noopener">Escríbenos</a>
@@ -90,12 +98,80 @@
     <ul class="envios-notas">
       <li>Solo hacemos envíos dentro del Perú.</li>
       <li>En cualquier opción también puedes pagar todo por adelantado.</li>
-      <li>Tu pedido queda separado al pagar el envío (delivery) o el producto (Shalom e InDrive), hasta por 1 semana. Para más tiempo, coordínalo por chat.</li>
-      <li>Envío gratis (cinturones de la Línea Premium y promos): cubre hasta S/16 en delivery, InDrive o Shalom. Si tu envío cuesta más, pagas solo la diferencia.</li>
+      <li>Tu pedido queda separado al pagar el envío (delivery) o el producto (Shalom, InDrive u Olva), hasta por 1 semana. Para más tiempo, coordínalo por chat.</li>
+      <li>Envío gratis (cinturones de la Línea Premium y promos): cubre hasta S/16 en delivery, InDrive u Olva, y el envío completo por Shalom. Si tu envío cuesta más, pagas solo la diferencia.</li>
     </ul>
     <p class="frase-talla">Aceptamos Yape, Plin y transferencia. Efectivo solo en contraentrega (monto exacto).</p>
   </section>
   <datalist id="listaDistritos"></datalist>
+
+  <!-- Preguntas frecuentes. Se abren tocando la pregunta. -->
+  <section class="cat faq" id="faq">
+    <h2 class="cat-titulo">Preguntas frecuentes</h2>
+    <details>
+      <summary>¿Cuánto demora en llegar mi pedido?</summary>
+      <div class="faq-resp">
+        <p><b>En Lima:</b> el recojo en San Miguel se coordina por chat, y a veces puede ser el mismo día. El envío express por InDrive llega el mismo día o en menos de 24 horas, según disponibilidad. El delivery con motorizado llega al día siguiente de dejarlo, de lunes a sábado de 11am a 7pm; a Ventanilla, Lurín, Lurigancho (Chosica), Ancón y Cieneguilla, en 48 horas.</p>
+        <p><b>En provincias:</b> por Shalom u Olva Courier, de 1 a 3 días según la ciudad. Te mandamos el código de seguimiento.</p>
+      </div>
+    </details>
+    <details>
+      <summary>¿Cómo pago?</summary>
+      <div class="faq-resp">
+        <p>Con Yape, Plin o transferencia. En efectivo solo en contraentrega, con el monto exacto.</p>
+        <p>En el recojo y en el delivery de Lima pagas el producto al recibir. Por Shalom, InDrive y Olva pagas el producto antes de enviar. En cualquier opción también puedes pagar todo por adelantado.</p>
+      </div>
+    </details>
+    <details>
+      <summary>¿Cómo separo mi pedido?</summary>
+      <div class="faq-resp">
+        <p>En delivery, adelantando el envío. Por Shalom, InDrive u Olva, pagando el producto. Lo separamos hasta por 1 semana; si lo necesitas para más adelante, coordínalo por chat.</p>
+      </div>
+    </details>
+    <details>
+      <summary>¿Hacen envíos fuera del Perú?</summary>
+      <div class="faq-resp"><p>Por ahora solo enviamos dentro del Perú.</p></div>
+    </details>
+    <details>
+      <summary>¿Cómo sé si el cinturón me queda?</summary>
+      <div class="faq-resp">
+        <p>Mide tu cintura en cm (con una cinta, o usa el número de tu pantalón favorito) y compara con el rango en cm de cada cinto. La talla de pantalón es solo referencial.</p>
+        <p>A todos los cintos se les puede hacer huecos extra para cinturas más pequeñas o grandes. Escríbenos y te ayudamos.</p>
+      </div>
+    </details>
+    <details>
+      <summary>¿Los collares se oxidan?</summary>
+      <div class="faq-resp">
+        <p>Cada producto dice su material. Los de acero inoxidable (el 316L es el de mejor calidad) aguantan el uso diario. Los de aleación duran más si evitas mojarlos y el contacto con perfume o químicos, y los guardas secos.</p>
+      </div>
+    </details>
+    <details>
+      <summary>¿Puedo cambiar mi producto?</summary>
+      <div class="faq-resp">
+        <p>Sí, dentro de los 7 días de recibido, sin uso y en su empaque. Los envíos del cambio los cubres tú, y si el nuevo producto cuesta más, pagas la diferencia.</p>
+        <p><b>En Lima:</b> el motorizado te lleva el nuevo y recoge el anterior en la misma visita. <b>En provincias:</b> nos lo envías por Olva Courier, lo revisamos y te mandamos el nuevo. Todo se coordina por chat.</p>
+      </div>
+    </details>
+    <details>
+      <summary>¿Y si mi producto llega con una falla?</summary>
+      <div class="faq-resp">
+        <p>Escríbenos apenas lo notes, con fotos o un video (lo ideal es dentro de las 48 horas de recibido). Lo revisamos y te damos una solución según el caso: cambio, otro producto o la devolución de tu dinero.</p>
+        <p>No hacemos devoluciones por cambio de opinión: para eso están los cambios.</p>
+      </div>
+    </details>
+    <details>
+      <summary>¿El envío gratis aplica siempre?</summary>
+      <div class="faq-resp">
+        <p>El envío gratis (cinturones de la Línea Premium y promos) cubre hasta S/16 en delivery, InDrive u Olva, y el envío completo por Shalom. Si tu envío cuesta más, pagas solo la diferencia.</p>
+      </div>
+    </details>
+    <details>
+      <summary>Se agotó lo que quería, ¿cómo me entero cuando vuelva?</summary>
+      <div class="faq-resp">
+        <p>Entra al producto y toca "Avísame por WhatsApp" o "Avísame por Instagram". Te escribimos apenas llegue.</p>
+      </div>
+    </details>
+  </section>
 
   <footer class="pie">
     <div class="pie-links">

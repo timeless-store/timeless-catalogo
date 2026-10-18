@@ -1,12 +1,12 @@
-/* Misma paleta que el dashboard (tema "Negro"). */
+/* Paleta: negro de la marca con acento azul (pedido de Alberto, 18-oct-2026). */
 :root{
   --bg:#141414;
   --card:#1c1c1c;
   --line:#2c2c2c;
   --bone:#f2f0ea;
   --muted:#8a8680;
-  --accent:#e8442c;
-  --accent-dim:#5c2016;
+  --accent:#3d7bff;
+  --accent-dim:#102552;
   --chip:#111111;
   --ok:#4ade80;
   --bad:#fb7185;
@@ -23,8 +23,8 @@
     --line:#e3e0d8;
     --bone:#181614;
     --muted:#6f6b65;
-    --accent:#d63a23;
-    --accent-dim:#fbdad4;
+    --accent:#1f5fe0;
+    --accent-dim:#dbe6ff;
     --chip:#efece6;
     --ok:#15803d;
     --bad:#be123c;
@@ -34,6 +34,8 @@
   }
 }
 *{box-sizing:border-box;}
+/* "hidden" siempre oculta, aunque la clase diga otra cosa (ej. un .btn). */
+[hidden]{display:none !important;}
 html{
   /* Evita que Safari/iOS agrande el texto por su cuenta. */
   -webkit-text-size-adjust:100%;
@@ -899,3 +901,101 @@ label.chip:focus-within{outline:2px solid var(--accent);outline-offset:2px;}
   html{scroll-behavior:auto;}
   .toast{transition:none;}
 }
+
+/* ---------- Promociones: combos que arma el cliente ---------- */
+.combos{display:grid;grid-template-columns:1fr;gap:14px;}
+@media (min-width:760px){ .combos{grid-template-columns:repeat(3, minmax(0, 1fr));} }
+.combo{
+  display:flex;
+  flex-direction:column;
+  background:var(--card);
+  border:1px solid var(--accent);
+  border-radius:16px;
+  overflow:hidden;
+}
+.combo-agotado{border-color:var(--line);}
+.combo-agotado .combo-foto img{opacity:.45;filter:grayscale(1);}
+.combo-foto{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;aspect-ratio:2/1;background:var(--chip);overflow:hidden;}
+.combo-foto img{width:100%;height:100%;object-fit:cover;display:block;min-width:0;}
+.combo-cuerpo{padding:14px;display:flex;flex-direction:column;gap:6px;flex:1;}
+.combo-nombre{font-size:16px;font-weight:800;line-height:1.3;}
+.combo-precio{font-size:24px;}
+.combo-titulo{margin:8px 0 2px;}
+.combo .chip{min-height:38px;font-size:13px;padding:0 12px;}
+.combo .chip[disabled]{cursor:not-allowed;text-decoration:line-through;}
+.combo .btn{margin-top:auto;}
+.combo-cuerpo .btn{margin-top:12px;}
+.cats a.nav-promos{border-color:var(--accent);color:var(--bone);}
+
+/* Botón llamativo del inicio cuando hay promos */
+.hero-promo{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  margin-top:16px;
+  padding:14px 16px;
+  border-radius:14px;
+  background:var(--accent);
+  color:#fff;
+  text-decoration:none;
+  box-shadow:0 8px 24px var(--accent-dim);
+  animation:latido 2.4s ease-in-out infinite;
+}
+.hero-promo-titulo{font-size:17px;font-weight:800;}
+.hero-promo-sub{font-size:13px;font-weight:600;opacity:.9;}
+@keyframes latido{0%,100%{transform:scale(1);}50%{transform:scale(1.015);}}
+@media (prefers-reduced-motion: reduce){ .hero-promo{animation:none;} }
+
+/* Aviso "!" del envío gratis */
+.cotiz-aviso{color:var(--warn);}
+.excl{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;margin-right:4px;border-radius:50%;
+  background:var(--warn);color:#111;font-size:11px;font-weight:900;
+}
+.aviso-ig{text-align:center;margin-top:8px;}
+.datos-opc{margin:-2px 0 6px;}
+
+/* ---------- Preguntas frecuentes ---------- */
+.faq details{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--card);
+  margin-top:8px;
+}
+.faq summary{
+  cursor:pointer;
+  list-style:none;
+  padding:14px 44px 14px 16px;
+  font-size:14px;
+  font-weight:700;
+  position:relative;
+}
+.faq summary::-webkit-details-marker{display:none;}
+.faq summary::after{content:"+";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:20px;color:var(--accent);}
+.faq details[open] summary::after{content:"–";}
+.faq-resp{padding:0 16px 14px;font-size:13.5px;line-height:1.6;color:var(--muted);}
+.faq-resp p{margin:0 0 8px;}
+.faq-resp p:last-child{margin-bottom:0;}
+
+/* ---------- Logo en la cabecera ---------- */
+.marca-logo{display:block;height:46px;width:auto;margin-top:2px;}
+@media (min-width:640px){ .marca-logo{height:54px;} }
+/* El logo es blanco: en tema claro se invierte a negro. */
+@media (prefers-color-scheme: light){ .marca-logo{filter:invert(1);} }
+
+/* ---------- Pantalla de carga: negro puro con el logo ---------- */
+.carga{
+  position:fixed;
+  inset:0;
+  z-index:100;
+  background:#000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:opacity .45s ease, visibility .45s ease;
+}
+.carga img{width:min(62vw, 340px);height:auto;animation:carga-aparece .8s ease both;}
+.carga.fuera{opacity:0;visibility:hidden;}
+@keyframes carga-aparece{from{opacity:0;transform:scale(.96);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion: reduce){ .carga, .carga img{transition:none;animation:none;} }

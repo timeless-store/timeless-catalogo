@@ -20,36 +20,46 @@
     <div class="eyebrow">Timeless Store</div>
     <h1>📖 Libro de Reclamaciones</h1>
 
-    <!-- TODO(Alberto): PÁGINA PROVISIONAL. Falta el formato oficial de Indecopi
-         ("Tu Libro de Reclamaciones": https://consumidor.gob.pe/libro-de-reclamaciones/).
-         Cuando lo tengas, aquí va el enlace o el formulario oficial y se borra el aviso. -->
-    <div class="setup-card" style="margin:0 0 16px">
-      <div class="setup-title">⚠️ Falta el formato oficial</div>
+    <!-- El formulario es un Google Forms de Alberto (aparte de todo lo del dashboard).
+         Su link va en config.js -> LIBRO_RECLAMACIONES_FORM. Mientras esté vacío,
+         se muestra el aviso de "falta el formulario". -->
+    <div class="setup-card" id="avisoForm" style="margin:0 0 16px">
+      <div class="setup-title">⚠️ Falta el formulario</div>
       <div class="setup-body">
-        Esta página es provisional. Todavía no tiene el formato oficial del Libro de
-        Reclamaciones Virtual de Indecopi, así que <b>no cumple aún</b> con la Ley N.º 32495.
-        No publicar el catálogo sin completar este paso.
+        Mientras terminamos de habilitar el formulario, escríbenos por Instagram
+        (<a id="igLink" href="#" target="_blank" rel="noopener">@<span id="igUser"></span></a>)
+        y atenderemos tu caso.
       </div>
     </div>
 
     <div class="card">
-      <p>Conforme al Código de Protección y Defensa del Consumidor, Timeless Store pone a tu
-      disposición su Libro de Reclamaciones Virtual para que registres una queja o un reclamo
-      sobre un producto o sobre la atención recibida.</p>
-      <p style="margin:0">Mientras terminamos de habilitar el formulario, escríbenos por Instagram
-      (<a id="igLink" href="#" target="_blank" rel="noopener">@<span id="igUser"></span></a>)
-      y atenderemos tu caso.</p>
+      <p>Conforme al Código de Protección y Defensa del Consumidor, ponemos a tu disposición
+      nuestro Libro de Reclamaciones Virtual para que registres una queja o un reclamo.</p>
+      <p><b>Proveedor:</b> HERRERA DEL AGUILA JOSE ALBERTO (Timeless Store)<br>
+      <b>RUC:</b> 10729712341<br>
+      <b>Domicilio fiscal:</b> Jr. Villavicencio 168, San Miguel, Lima</p>
+      <p><b>Reclamo:</b> disconformidad con el producto. <b>Queja:</b> disconformidad con la atención, no relacionada con el producto.</p>
+      <p>Al enviar el formulario recibirás una copia en tu correo. Te responderemos en un plazo máximo de <b>15 días hábiles</b>.</p>
+      <a class="btn btn-primario" id="formLink" href="#" target="_blank" rel="noopener" hidden>Llenar la hoja de reclamación</a>
+      <p class="nota-chica" style="margin-top:12px">La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante el Indecopi.</p>
     </div>
   </div>
 </div>
 
 <script src="config.js"></script>
 <script>
-  // El usuario de Instagram sale de config.js: es el único lugar donde se escribe.
+  // Instagram y el link del formulario salen de config.js.
   (function () {
-    var u = (typeof CATALOGO_CONFIG !== 'undefined' && CATALOGO_CONFIG.INSTAGRAM_USUARIO) || '';
+    var c = (typeof CATALOGO_CONFIG !== 'undefined') ? CATALOGO_CONFIG : {};
+    var u = c.INSTAGRAM_USUARIO || '';
     document.getElementById('igUser').textContent = u;
     document.getElementById('igLink').href = 'https://www.instagram.com/' + encodeURIComponent(u) + '/';
+    if (c.LIBRO_RECLAMACIONES_FORM) {
+      var a = document.getElementById('formLink');
+      a.href = c.LIBRO_RECLAMACIONES_FORM;
+      a.hidden = false;
+      document.getElementById('avisoForm').hidden = true;
+    }
   })();
 </script>
 </body>

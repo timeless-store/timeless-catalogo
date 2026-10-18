@@ -368,10 +368,15 @@ function promoActiva(pr, ahora){
   if(isNaN(pr.hasta)) return false;   // fecha mal escrita: no se aplica
   return ahora < pr.hasta;
 }
+// Un token puede traer opciones separadas por "/": en un combo, "Cinturón Black
+// Spider/Cinturón White Spider" quiere decir "cualquiera de los dos".
 function coincideAlcance(token, p){
-  const t = norm(token);
-  if(t.indexOf('categoria:') === 0) return norm(p.categoria) === t.slice(10).trim();
-  return norm(p.nombre) === t || (!!p.grupo && norm(p.grupo) === t);
+  return String(token).split('/').some(alt => {
+    const t = norm(alt);
+    if(!t) return false;
+    if(t.indexOf('categoria:') === 0) return norm(p.categoria) === t.slice(10).trim();
+    return norm(p.nombre) === t || (!!p.grupo && norm(p.grupo) === t);
+  });
 }
 function enAlcance(pr, p){ return pr.alcance.some(t => coincideAlcance(t, p)); }
 const centavos = n => Math.round(n * 100) / 100;
@@ -434,6 +439,18 @@ function saveCache(rows, key){
   try{ localStorage.setItem(key || CACHE_KEY, JSON.stringify(rows)); }catch(e){}
 }
 
+// Pantalla negra de carga: se va apenas el catálogo está pintado (mínimo
+// 0.7 s para que no parpadee, y máximo 4 s por si algo tarda de más).
+function quitarCarga(){
+  const c = document.getElementById('carga');
+  if(!c || c.classList.contains('fuera')) return;
+  setTimeout(() => {
+    c.classList.add('fuera');
+    setTimeout(() => { if(c.parentNode) c.parentNode.removeChild(c); }, 600);
+  }, Math.max(0, 700 - performance.now()));
+}
+setTimeout(quitarCarga, 4000);
+
 function usarFilas(rows){
   const todos = filasAProductos(rows);
   aplicarEstado(todos, FILAS_ESTADO);
@@ -443,6 +460,7 @@ function usarFilas(rows){
   construirEntradas();
   firmaOfertas = calcFirma(Date.now());
   renderTodo();
+  quitarCarga();
 }
 
 // La lista de estado del dashboard es opcional: si no carga, se usa la última
@@ -484,6 +502,7 @@ function cargar(){
     // confirma stock y precio de todas formas.
     const guardado = loadCache();
     if(guardado){ promosListas.then(() => usarFilas(guardado)); return; }
+    quitarCarga();
     console.log('No se pudo leer el catálogo:', err);
     estado.innerHTML = location.protocol === 'file:'
       ? 'Esta página no funciona abriendo el archivo con doble clic:<br>el navegador bloquea la lectura de los productos.<br>Hay que abrirla desde el servidor local (ver PROGRESO.md) o ya publicada.'
@@ -541,7 +560,7 @@ function tarjetaHTML(e, ahora){
   else {
     if(e.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
     if(oferta) tags += '<span class="tag tag-oferta">Oferta</span>';
-    if(e.pocos) tags += '<span class="tag tag-pocos">Quedan pocos</span>';
+    if(e.pocos) tags += '<span class="tag tag-pocos">Últimas unidades</span>';
   }
   const apagado = !e.disponible && !e.proximamente;
   // Un grupo en una sola tarjeta lista sus colores; una tarjeta de un color avisa que hay otros.
@@ -560,16 +579,125 @@ function tarjetaHTML(e, ahora){
     '</div></a>';
 }
 
+/* ---------- Sección de promociones (combos que arma el cliente) ----------
+   Sale sola mientras haya combos activos en promos.csv. Cada combo tiene
+   "casilleros" (Productos separados por "|") y cada casillero sus opciones
+   (separadas por "/"): el cliente elige una de cada uno y agrega el combo. El
+   descuento lo calcula el carrito con las mismas reglas de siempre. */
+const comboSel = {};   // índice del combo en PROMOS -> ids elegidos por casillero
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
+// "20 de octubre" a partir de un instante (en hora de Lima).
+function fechaCortaLima(ms){
+  const d = new Date(ms - 5 * 3600 * 1000);
+  return d.getUTCDate() + ' de ' + MESES[d.getUTCMonth()];
+}
+function combosActivos(ahora){
+  return PROMOS.map((pr, i) => ({pr: pr, i: i})).filter(x => x.pr.tipo === 'combo' && promoActiva(x.pr, ahora));
+}
+// Productos que entran en un casillero, en el orden en que están escritos.
+function opcionesCasillero(token){
+  const out = [];
+  String(token).split('/').forEach(alt => PRODUCTOS.forEach(p => {
+    if(coincideAlcance(alt, p) && out.indexOf(p) === -1) out.push(p);
+  }));
+  return out;
+}
+// "Black" para un color; "Demon Cross" para un collar (sin "Collar" adelante).
+function nombreCorto(p){
+  if(p.grupo && p.variante) return p.variante;
+  return p.nombre.replace(/^(cintur[oó]n|collar(es)?|pant chain|anillos?)\s+(de\s+)?/i, '');
+}
+const ELIGE = {cinturones: 'Elige tu cinturón', collares: 'Elige tu collar', 'pant chains': 'Elige tu pant chain', anillos: 'Elige tus anillos'};
+
+// Foto que es solo de ese producto (en un grupo con foto de todos juntos, la
+// primera de su color; si no, su primera foto).
+function fotoPropia(p){
+  if(!p) return FOTO_VACIA;
+  const e = ENTRADA_POR_ID[p.id];
+  const f = e && e.juntos ? e.fotos[p.indiceFoto] : null;
+  return f && !esVideo(f) ? f : fotoDe(p);
+}
+function comboHTML(x, ahora){
+  const casilleros = x.pr.alcance.map(opcionesCasillero);
+  const sel = comboSel[x.i] = casilleros.map((ops, s) => {
+    const previo = (comboSel[x.i] || [])[s];
+    const ok = ops.find(p => p.id === previo && p.disponible);
+    return ok ? ok.id : ((ops.find(p => p.disponible) || {}).id || null);
+  });
+  const completo = sel.every(Boolean);
+  const elegidos = sel.map(id => POR_ID[id]).filter(Boolean);
+  const normal = elegidos.reduce((a, p) => a + precioVigente(p, ahora), 0);
+  const gratis = elegidos.some(p => p.envioGratis);
+  // Una foto por casillero, lado a lado: la del producto elegido (cambia al elegir).
+  const fotosCombo = casilleros.map((ops, s) => fotoPropia(POR_ID[sel[s]] || ops[0]));
+  return '<div class="combo' + (completo ? '' : ' combo-agotado') + '">' +
+    '<div class="combo-foto">' + fotosCombo.map(f => '<img loading="lazy" src="' + esc(f) + '" alt="">').join('') + '</div>' +
+    '<div class="combo-cuerpo">' +
+      '<div class="combo-nombre">' + esc(x.pr.nombre) + '</div>' +
+      '<div class="precios"><span class="precio-oferta combo-precio">' + fmtPrecio(x.pr.valor) + '</span>' +
+        (completo && normal > x.pr.valor ? '<span class="precio-antes">' + fmtPrecio(normal) + '</span>' : '') + '</div>' +
+      (gratis ? '<div class="envio-gratis">Con envío gratis</div>' : '') +
+      (x.pr.hasta ? '<div class="cuenta">Termina en <b class="mono" data-hasta="' + x.pr.hasta + '">' + fmtCuenta(x.pr.hasta - ahora) + '</b></div>' : '') +
+      casilleros.map((ops, s) => '<div class="variantes-titulo combo-titulo">' + esc(ELIGE[norm(ops[0] ? ops[0].categoria : '')] || 'Elige uno') + '</div>' +
+        '<div class="chips">' + ops.map(p => '<button type="button" class="chip' + (p.id === sel[s] ? ' activo' : '') + (p.disponible ? '' : ' agotado') + '"' +
+          (p.disponible ? '' : ' disabled') + ' data-combo="' + x.i + '" data-casillero="' + s + '" data-op="' + esc(p.id) + '">' +
+          esc(nombreCorto(p)) + (p.disponible ? '' : ' · Agotado') + '</button>').join('') + '</div>').join('') +
+      (completo
+        ? '<button type="button" class="btn btn-primario" data-combo-agregar="' + x.i + '">Agregar combo al carrito</button>'
+        : '<button type="button" class="btn" disabled>Agotado: mira los otros combos</button>') +
+    '</div></div>';
+}
+function promosSeccionHTML(ahora){
+  const combos = combosActivos(ahora);
+  if(!combos.length) return '';
+  return '<section class="cat" id="promos"><h2 class="cat-titulo">Promociones</h2>' +
+    '<p class="sub-desc">Elige tu combo y agrégalo: el precio de la promo se aplica solo en tu carrito.</p>' +
+    '<div class="combos">' + combos.map(x => comboHTML(x, ahora)).join('') + '</div></section>';
+}
+// Botón llamativo del inicio cuando hay promos.
+function renderHeroPromo(ahora){
+  const el = document.getElementById('heroPromo');
+  if(!el) return;
+  const combos = combosActivos(ahora);
+  if(!combos.length){ el.innerHTML = ''; return; }
+  const fines = combos.map(x => x.pr.hasta).filter(h => h && !isNaN(h));
+  el.innerHTML = '<a class="hero-promo" href="#promos" data-scroll="promos"><span class="hero-promo-titulo">🔥 Promos disponibles</span>' +
+    '<span class="hero-promo-sub">' + (fines.length ? 'Hasta el ' + fechaCortaLima(Math.min.apply(null, fines)) + ' · ' : '') + 'Ver promos →</span></a>';
+}
+document.getElementById('catalogo').addEventListener('click', e => {
+  const op = e.target.closest('[data-op]');
+  if(op){
+    const i = Number(op.dataset.combo), s = Number(op.dataset.casillero);
+    (comboSel[i] = comboSel[i] || [])[s] = op.dataset.op;
+    renderGrilla();
+    return;
+  }
+  const add = e.target.closest('[data-combo-agregar]');
+  if(add){
+    const ids = comboSel[Number(add.dataset.comboAgregar)] || [];
+    if(ids.length && ids.every(id => sePuedePedir(POR_ID[id]))){
+      ids.forEach(id => agregar(id));
+      toast('Combo agregado: el precio de la promo ya está en tu carrito');
+      location.hash = '#/carrito';
+    }
+  }
+});
+
 function renderGrilla(){
   const ahora = Date.now();
   const main = document.getElementById('catalogo');
   const nav = document.getElementById('catsNav');
   const grupos = agrupar();
+  renderHeroPromo(ahora);
   if(!grupos.length){
     nav.innerHTML = '';
     main.innerHTML = '<div class="estado">Todavía no hay productos en el catálogo.</div>';
     return;
   }
+  const promosHTML = promosSeccionHTML(ahora);
+  // Dónde va la sección de promos: 'primero' (arriba de Más vendidos) o
+  // 'despues-de-mas-vendidos'. Se cambia en config.js.
+  const promosPrimero = cfg.PROMOS_POSICION !== 'despues-de-mas-vendidos';
   // "Más vendidos": los que tienen puesto de BestSeller (1 = primero), máximo 6.
   // Un agotado sale de la fila y entra el siguiente; uno con "Restock en camino"
   // se queda en su puesto con esa etiqueta, para que la gente sepa que vuelve.
@@ -580,10 +708,12 @@ function renderGrilla(){
     ? '<section class="cat" id="cat-mas-vendidos"><h2 class="cat-titulo">Más vendidos</h2>' +
       '<div class="fila">' + mas.map(e => tarjetaHTML(e, ahora)).join('') + '</div></section>'
     : '';
-  nav.innerHTML = (mas.length ? '<a href="#cat-mas-vendidos" data-cat="cat-mas-vendidos">Más vendidos</a>' : '') +
+  const navPromos = promosHTML ? '<a href="#promos" data-cat="promos" class="nav-promos">🔥 Promos</a>' : '';
+  const navMas = mas.length ? '<a href="#cat-mas-vendidos" data-cat="cat-mas-vendidos">Más vendidos</a>' : '';
+  nav.innerHTML = (promosPrimero ? navPromos + navMas : navMas + navPromos) +
     grupos.map(g => '<a href="#' + esc(g.id) + '" data-cat="' + esc(g.id) + '">' + esc(g.nombre) + '</a>').join('') +
-    '<a href="#envios" data-cat="envios">Envíos y pagos</a>';
-  main.innerHTML = masHTML + grupos.map(g =>
+    '<a href="#envios" data-cat="envios">Envíos y pagos</a><a href="#faq" data-cat="faq">Preguntas</a>';
+  main.innerHTML = (promosPrimero ? promosHTML + masHTML : masHTML + promosHTML) + grupos.map(g =>
     '<section class="cat" id="' + esc(g.id) + '">' +
     '<h2 class="cat-titulo">' + esc(g.nombre) + ' <span class="cat-cuenta">' + g.items.length + '</span></h2>' +
     '<div class="grilla">' + g.items.map(e => tarjetaHTML(e, ahora)).join('') + '</div>' +
@@ -667,6 +797,9 @@ const CAMPOS_DATOS = {
   shalom: [['nombres', 'Nombres y apellidos completos'], ['celular', 'Celular', 'tel'], ['dni', 'DNI', 'text', 'numeric'],
            ['departamento', 'Departamento'], ['provincia', 'Provincia'], ['distrito', 'Distrito'],
            ['agencia', 'Agencia de Shalom'], ['correo', 'Correo (opcional)', 'email']],
+  olva: [['nombres', 'Nombres y apellidos completos'], ['celular', 'Celular', 'tel'], ['dni', 'DNI', 'text', 'numeric'],
+         ['direccion', 'Dirección completa'], ['referencia', 'Referencia'], ['distrito', 'Distrito'],
+         ['provincia', 'Provincia'], ['departamento', 'Departamento']],
 };
 
 /* ---------- Costo de envío por distrito ---------- */
@@ -698,8 +831,10 @@ function cotizacionHTML(txt, gratis, enCarrito){
   let h = '<div class="cotiz"><div class="cotiz-fila"><span>Delivery a ' + esc(d.n) + '</span><b>' + textoRango(r) + '</b></div>';
   if(d.nota) h += '<div class="cotiz-nota">' + esc(d.nota) + '</div>';
   h += '<div class="cotiz-nota">' + (d.h48 ? 'Llega en 48 horas.' : 'Llega de un día para otro.') + ' Sujeto a cobertura: lo confirmamos por chat.</div>';
-  if(gratis) h += '<div class="cotiz-nota cotiz-ok">Tu envío gratis cubre hasta ' + fmtPrecio(cubreGratis()) +
-    (r.max > cubreGratis() ? '; si tu zona sale más, pagas solo la diferencia.' : '.') + '</div>';
+  // Envío gratis: si la zona puede pasar de lo que cubre, va el aviso "!" (y Shalom, que sí es 100% gratis).
+  if(gratis) h += r.max > cubreGratis()
+    ? '<div class="cotiz-nota cotiz-aviso"><b class="excl">!</b> Tu envío gratis cubre hasta ' + fmtPrecio(cubreGratis()) + ': si tu zona sale más, pagas solo la diferencia. Por Shalom es 100% gratis.</div>'
+    : '<div class="cotiz-nota cotiz-ok">✓ Tu envío es gratis.</div>';
   if(r.max > RECOMENDAR_SHALOM_DESDE){
     h += '<div class="recomendado"><b>Opción recomendada: Shalom, ' + fmtPrecio(costoShalom()) + '</b>' +
       '<span>Sale más barato a tu distrito. Pagas el producto antes, el envío al recibir, y lo recoges cuando puedas en tu agencia.</span>' +
@@ -714,7 +849,7 @@ function envioEstimado(id, gratis){
   const cubre = cubreGratis();
   if(id === 'recojo') return {texto: 'Sin costo', costo: 0};
   if(id === 'shalom') return gratis ? {texto: 'Gratis', costo: 0} : {texto: fmtPrecio(costoShalom()) + ' al recibir', costo: costoShalom()};
-  if(id === 'indrive') return {texto: gratis ? 'Gratis hasta ' + fmtPrecio(cubre) : 'Se cotiza por chat', costo: null};
+  if(id === 'indrive' || id === 'olva') return {texto: gratis ? 'Gratis hasta ' + fmtPrecio(cubre) : 'Se cotiza por chat', costo: null};
   if(id === 'moto'){
     const d = buscarDistrito(distritoTxt);
     if(!d) return {texto: 'desde ' + fmtPrecio(cfg.ENVIO_MINIMO_MOTO || 10), costo: null};
@@ -835,7 +970,7 @@ function textoPedido(){
       if(fechaEntrega && !avisoFecha(fechaEntrega)) t += '\nDía de entrega: ' + fechaBonita(fechaEntrega);
       t += '\nEl producto lo pago al recibir con: ' + pagoProducto;
     }
-    if(id === 'shalom' || id === 'indrive') t += '\nYapeo ' + fmtPrecio(ped.productos) + ' (productos) al ' + (y.numero || '') + ' y te envío la captura.';
+    if(id === 'shalom' || id === 'indrive' || id === 'olva') t +='\nYapeo ' + fmtPrecio(ped.productos) + ' (productos) al ' + (y.numero || '') + ' y te envío la captura.';
     const campos = (CAMPOS_DATOS[id] || []).filter(c => String(datos[c[0]] || '').trim());
     if(campos.length) t += '\n\nMis datos:\n' + campos.map(c => c[1].replace(/ \(.*\)$/, '') + ': ' + String(datos[c[0]]).trim()).join('\n');
   }
@@ -861,7 +996,8 @@ function avisoHTML(p){
     (avisoCopiado === p.id
       ? '<div class="copiado" style="margin-top:14px">✓ Mensaje copiado. Pégalo en el chat que se abre.</div>' +
         '<a class="btn" href="' + esc(urlInstagramChat()) + '" target="_blank" rel="noopener">Abrir chat de Instagram</a>'
-      : '<button type="button" class="btn" data-aviso-ig="' + esc(p.id) + '">Avísame por Instagram</button>');
+      : '<button type="button" class="btn" data-aviso-ig="' + esc(p.id) + '">Avísame por Instagram</button>' +
+        '<p class="nota-chica aviso-ig">Ojo: si cambias tu usuario de Instagram o desactivas tu cuenta, no podremos avisarte. Por WhatsApp es más seguro.</p>');
 }
 
 /* ---------- Ficha de producto ---------- */
@@ -912,7 +1048,7 @@ function renderFicha(indice){
           '</div></div>'
         : '') +
       '<div class="ficha-precios">' + preciosHTML(p, ahora) + '</div>' +
-      (p.disponible && p.pocos ? '<div class="pocos">Quedan pocos</div>' : '') +
+      (p.disponible && p.pocos ? '<div class="pocos">Últimas unidades</div>' : '') +
       (p.disponible ? cuentaHTML(p, ahora, 'ficha-cuenta') : '') +
       (p.envioGratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Envío gratis llevando este producto</div>' : '') +
       (promos.length ? '<div class="promo-caja">' + promos.map(t => '<div>🏷 ' + esc(t) + '</div>').join('') + '</div>' : '') +
@@ -986,7 +1122,8 @@ function detalleEnvioHTML(id, ped){
   const yape = (monto, para) => '<div class="yape"><div class="yape-monto">Yapea ' + monto + '</div>' +
     '<div>al <b class="mono">' + esc(y.numero || '') + '</b> · ' + esc(y.nombre || '') + '</div>' +
     '<div class="nota-chica">' + para + ' Luego envía la captura en el chat junto con tu pedido.</div></div>';
-  const campos = (titulo, extra) => '<div class="datos-form"><div class="variantes-titulo">' + titulo + '</div>' +
+  const campos = (titulo, extra) => '<div class="datos-form"><div class="variantes-titulo">' + titulo + ' (opcional)</div>' +
+    '<p class="nota-chica datos-opc">Si los llenas, llegan junto con tu pedido y es más rápido. Si prefieres, mándanoslos por chat.</p>' +
     (CAMPOS_DATOS[id] || []).map(c =>
       '<label class="campo"><span>' + esc(c[1]) + (c[0] === 'maps' ? ' ' + infoHTML('Cómo mandar tu ubicación',
         '<b>¿No tienes el link?</b> Mándanos por WhatsApp tu <b>ubicación actual</b> (no "en tiempo real"): se ve así 👇' +
@@ -1019,6 +1156,11 @@ function detalleEnvioHTML(id, ped){
     h += yape(fmtPrecio(ped.productos), 'Es el pago de tus productos; el envío lo pagas al recibir (te lo cotizamos por chat).') +
       '<p class="nota-chica">Coordinamos el día y la hora por chat. Te mandamos foto al dejarlo con el conductor y el seguimiento en vivo.</p>' +
       campos('Tus datos para el envío');
+  }
+  if(id === 'olva'){
+    h += yape(fmtPrecio(ped.productos), 'Es el pago de tus productos. El envío depende de tu ciudad: te lo cotizamos por chat y lo yapeas también antes de enviar.') +
+      '<p class="nota-chica">Te llega a tu casa, sin ir a una agencia. Te mandamos el código de seguimiento al registrarlo.</p>' +
+      campos('Tus datos para Olva');
   }
   if(id === 'shalom'){
     h += yape(fmtPrecio(ped.productos), 'Es el pago de tus productos; el envío (' + (ped.gratis ? 'gratis' : fmtPrecio(costoShalom())) + ') lo pagas al recibir.') +

@@ -103,7 +103,17 @@ const CATALOGO_CONFIG = {
      texto: 'Enviamos desde San Miguel; recomendado para distritos cercanos (a veces sale más barato que el motorizado). El costo y la hora se coordinan por chat. Te mandamos foto y el seguimiento en vivo.'},
     {id: 'shalom', nombre: 'Shalom — todo el Perú', pago: 'Pagas el producto antes · el envío al recibir',
      texto: 'Envío S/8 que pagas al recibir (S/12 solo en algunas zonas de la selva). En Lima llega al día siguiente de dejarlo y lo recoges cuando puedas, en el horario de tu agencia. Te mandamos la guía y la clave al registrarlo.'},
+    {id: 'olva', nombre: 'Olva Courier — a tu casa', pago: 'Pagas productos y envío antes',
+     texto: 'Te llega a tu casa en todo el Perú, sin ir a una agencia. El envío depende de tu ciudad: te lo cotizamos por chat y pagas todo junto antes de enviar. Te mandamos el código de seguimiento.'},
   ],
+
+  // Link del Google Forms del Libro de Reclamaciones (lo crea Alberto). Vacío =
+  // la página muestra el aviso de "falta el formulario".
+  LIBRO_RECLAMACIONES_FORM: '',
+
+  // Dónde va la sección de Promociones cuando hay combos activos:
+  // 'primero' (arriba de Más vendidos) o 'despues-de-mas-vendidos'.
+  PROMOS_POSICION: 'primero',
 
   // Líneas dentro de una categoría (columna "Linea" de la hoja). Se muestran como
   // etiqueta en la tarjeta (con esta descripción al pasar el cursor) y en la ficha.

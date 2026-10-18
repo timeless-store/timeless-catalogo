@@ -116,3 +116,13 @@
 - **Más vendidos**: máximo 6; los que tienen "Restock en camino" se quedan con esa etiqueta.
 - Un agotado no muestra una oferta sin fecha de fin.
 - En PC, las fotos de cada tarjeta van cambiando al pasar el cursor.
+
+## 11. Promos, preguntas frecuentes y diseño (18 de octubre, noche)
+
+- **Promociones**: los combos activos de `promos.csv` salen en su propia sección (arriba de todo; se mueve con `PROMOS_POSICION` en `config.js`), con un botón llamativo en el inicio y "🔥 Promos" en el menú. En un combo, `A/B` = "A o B": el cliente elige el color del cinturón y el collar o pant chain; lo agotado sale tachado y, si un casillero se queda sin opciones, el combo dice "Agotado: mira los otros combos". El descuento lo aplica el carrito. Hoy: los 3 combos araña del Canva, hasta el 20-oct a las 23:59. Las promos viejas quedaron apagadas.
+- **Olva Courier** como quinta forma de envío (paga productos antes; el envío se cotiza por chat).
+- **Datos del envío opcionales** en el carrito.
+- "Quedan pocos" ahora dice **"Últimas unidades"**. Aviso "!" cuando el envío gratis puede no cubrir todo. Nota en "Avísame por Instagram" sobre cambiar de usuario.
+- **Preguntas frecuentes** (tiempos, pagos, separar, tallas, materiales, cambios, fallas, envío gratis).
+- **Acento azul**, logo en la cabecera, **pantalla de carga negra con el logo**, íconos con la T más grande.
+- **Libro de Reclamaciones**: datos del proveedor listos; falta el link del Google Forms (`LIBRO_RECLAMACIONES_FORM`).

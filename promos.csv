@@ -1,6 +1,9 @@
 Nombre,Tipo,Productos,Cantidad,Valor,Hasta,Activa,Texto
-Combo Dark Knight + Demon Cross,combo,Cinturón Dark Knight|Collar Demon Cross,,60,,SI,Llévalo junto al Collar Demon Cross y paga S/60 en vez de S/65
-Collar Ameri Duki x3,paquete,Collar Ameri Duki,3,110,,SI,3 collares Ameri Duki por S/110
-Collar Ameri Duki x2,paquete,Collar Ameri Duki,2,75,,SI,2 collares Ameri Duki por S/75
-Collar Gengar x2,paquete,Collares Gengar,2,55,,SI,2 collares Gengar por S/55 (en cualquier color)
+Cinturón Spider + 1 collar,combo,Cinturón Black Spider/Cinturón White Spider|Collar Demon Cross/Collar Gothic Cross/Collar Shadow Cross/Collar Aracnic Chain/Collar Gothic Pearls,,99,2026-10-20 23:59,SI,"Combo: Cinturón Spider Black o White + 1 collar por S/99, con envío gratis"
+Cinturón Spider + collar Starboy o Spiderman,combo,Cinturón Black Spider/Cinturón White Spider|Collar Starboy/Collar Spiderman,,89,2026-10-20 23:59,SI,"Combo: Cinturón Spider Black o White + collar Starboy o Spiderman por S/89, con envío gratis"
+Cinturón Spider + 1 pant chain,combo,Cinturón Black Spider/Cinturón White Spider|Pant Chain Skeleton/Pant Chain Spiderboy,,105,2026-10-20 23:59,SI,"Combo: Cinturón Spider Black o White + 1 pant chain por S/105, con envío gratis"
+Combo Dark Knight + Demon Cross,combo,Cinturón Dark Knight|Collar Demon Cross,,60,,NO,Llévalo junto al Collar Demon Cross y paga S/60 en vez de S/65
+Collar Ameri Duki x3,paquete,Collar Ameri Duki,3,110,,NO,3 collares Ameri Duki por S/110
+Collar Ameri Duki x2,paquete,Collar Ameri Duki,2,75,,NO,2 collares Ameri Duki por S/75
+Collar Gengar x2,paquete,Collares Gengar,2,55,,NO,2 collares Gengar por S/55 (en cualquier color)
 Segundo collar -S/5 (EJEMPLO apagado),descuento,categoria:Collares,2,5,,NO,Llevando 2 collares te descontamos S/5
