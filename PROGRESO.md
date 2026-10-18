@@ -20,7 +20,7 @@
 - "Avísame cuando vuelva" solo en agotados, por WhatsApp o Instagram.
 - Envíos y pagos al final, botón de Instagram y TikTok, Libro de Reclamaciones provisional.
 - **Fotos reales** en `fotos/<producto>/` (29 de 36 productos al 18 de octubre): primero las de persona, luego maniquí, luego mesa o en mano; los videos al final y siempre sin sonido.
-- Se puede instalar en el celular. Versión del caché: `timeless-catalogo-v11`.
+- Se puede instalar en el celular. Versión del caché: `timeless-catalogo-v12`.
 
 ## 2. Las hojas
 
