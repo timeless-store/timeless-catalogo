@@ -111,6 +111,10 @@ const CATALOGO_CONFIG = {
   // la página muestra el aviso de "falta el formulario".
   LIBRO_RECLAMACIONES_FORM: '',
 
+  // Fotos de clientes con sus pedidos (carrusel "Clientes"). Ej: 'img/clientes/1.jpg'.
+  // Vacío = la sección dice "Muy pronto".
+  CLIENTES_FOTOS: [],
+
   // Dónde va la sección de Promociones cuando hay combos activos:
   // 'primero' (arriba de Más vendidos) o 'despues-de-mas-vendidos'.
   PROMOS_POSICION: 'primero',

@@ -445,6 +445,8 @@ function saveCache(rows, key){
 function quitarCarga(){
   const c = document.getElementById('carga');
   if(!c || c.classList.contains('fuera')) return;
+  // Por si el navegador movió la página mientras cargaba: arranca arriba.
+  if(!location.hash) window.scrollTo(0, 0);
   setTimeout(() => {
     c.classList.add('fuera');
     setTimeout(() => { if(c.parentNode) c.parentNode.removeChild(c); }, 600);
@@ -618,37 +620,44 @@ function fotoPropia(p){
   const f = e && e.juntos ? e.fotos[p.indiceFoto] : null;
   return f && !esVideo(f) ? f : fotoDe(p);
 }
-// Estado de un combo: sus casilleros, lo elegido en cada uno (si lo elegido se
-// agotó, pasa a la primera opción que haya), el precio normal y el envío gratis.
+// Estado de un combo: sus casilleros y lo elegido en cada uno. Al abrirlo no hay
+// nada elegido (se ve la foto del combo completo); si un casillero tiene una
+// sola opción (ej. la Pant Chain Skeleton), va elegida sola. Si lo elegido se
+// agota, se des-elige.
 function estadoCombo(x, ahora){
   const casilleros = x.pr.alcance.map(opcionesCasillero);
   const sel = comboSel[x.i] = casilleros.map((ops, s) => {
     const previo = (comboSel[x.i] || [])[s];
     const ok = ops.find(p => p.id === previo && p.disponible);
-    return ok ? ok.id : ((ops.find(p => p.disponible) || {}).id || null);
+    if(ok) return ok.id;
+    return ops.length === 1 && ops[0].disponible ? ops[0].id : null;
   });
   const elegidos = sel.map(id => POR_ID[id]).filter(Boolean);
   return {casilleros: casilleros, sel: sel, completo: sel.every(Boolean),
+          // ¿Se puede armar? Cada casillero tiene que tener al menos una opción con stock.
+          disponible: casilleros.every(ops => ops.some(p => p.disponible)),
           normal: elegidos.reduce((a, p) => a + precioVigente(p, ahora), 0),
-          gratis: elegidos.some(p => p.envioGratis)};
+          // Envío gratis si alguna opción lo trae (el cinturón premium, en estos combos).
+          gratis: casilleros.some(ops => ops.length && ops.every(p => p.envioGratis))};
 }
 // Tarjeta del combo en la página: la foto del combo (la del Canva), precio y "Arma tu combo".
 function comboHTML(x, ahora){
   const st = estadoCombo(x, ahora);
-  const foto = x.pr.foto || fotoPropia(POR_ID[st.sel[0]] || (st.casilleros[0] || [])[0]);
-  return '<a class="combo' + (st.completo ? '' : ' combo-agotado') + '" href="#/combo/' + x.i + '">' +
+  const foto = x.pr.foto || fotoPropia((st.casilleros[0] || [])[0]);
+  return '<a class="combo' + (st.disponible ? '' : ' combo-agotado') + '" href="#/combo/' + x.i + '">' +
     '<div class="combo-foto"><img loading="lazy" src="' + esc(foto) + '" alt="' + esc(x.pr.nombre) + '"></div>' +
     '<div class="combo-cuerpo">' +
       '<div class="combo-nombre">' + esc(x.pr.nombre) + '</div>' +
       '<div class="precios"><span class="precio-oferta combo-precio">' + fmtPrecio(x.pr.valor) + '</span></div>' +
       (st.gratis ? '<div class="envio-gratis">Con envío gratis</div>' : '') +
       (x.pr.hasta ? '<div class="cuenta">Termina en <b class="mono" data-hasta="' + x.pr.hasta + '">' + fmtCuenta(x.pr.hasta - ahora) + '</b></div>' : '') +
-      (st.completo ? '<span class="btn btn-primario">Arma tu combo</span>' : '<span class="btn" aria-disabled="true">Agotado: mira los otros combos</span>') +
+      (st.disponible ? '<span class="btn btn-primario">Arma tu combo</span>' : '<span class="btn" aria-disabled="true">Agotado: mira los otros combos</span>') +
     '</div></a>';
 }
-// Fotos y videos de un producto, en una tira que se desliza.
+// Todas las fotos y videos de un producto, en una tira que se desliza. Las
+// fotos se ven completas (sin recortar), para que el dije se vea entero.
 function tiraMediosHTML(p){
-  const medios = (p.fotos.length ? p.fotos : fotoEntradaLista(p)).slice(0, 12);
+  const medios = p.fotos.length ? p.fotos : fotoEntradaLista(p);
   return '<div class="combo-tira">' + medios.map(f => esVideo(f)
     ? '<video src="' + esc(f) + '#t=0.1" controls muted playsinline preload="metadata"></video>'
     : '<img loading="lazy" src="' + esc(f) + '" alt="' + esc(p.nombre) + '">').join('') + '</div>';
@@ -667,6 +676,7 @@ function renderCombo(){
     return;
   }
   const st = estadoCombo(x, ahora);
+  const falta = st.casilleros.map((ops, s) => st.sel[s] ? '' : (ELIGE[norm(ops[0] ? ops[0].categoria : '')] || 'Elige uno').replace(/^Elige tu /, 'tu ')).filter(Boolean);
   body.innerHTML =
     (x.pr.foto ? '<div class="galeria"><img class="combo-portada" src="' + esc(x.pr.foto) + '" alt="' + esc(x.pr.nombre) + '"></div>' : '') +
     '<div class="sheet-pad">' +
@@ -677,7 +687,7 @@ function renderCombo(){
       (st.gratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Con envío gratis</div>' : '') +
       (x.pr.hasta ? '<div class="cuenta ficha-cuenta">Termina en <b class="mono" data-hasta="' + x.pr.hasta + '">' + fmtCuenta(x.pr.hasta - ahora) + '</b></div>' : '') +
       st.casilleros.map((ops, s) => {
-        const elegido = POR_ID[st.sel[s]] || ops[0];
+        const elegido = POR_ID[st.sel[s]];
         const titulo = ops.length > 1 ? (ELIGE[norm(ops[0] ? ops[0].categoria : '')] || 'Elige uno') : 'Incluye';
         return '<div class="combo-paso"><div class="variantes-titulo">' + (s + 1) + '. ' + esc(titulo) + '</div>' +
           (ops.length > 1
@@ -685,12 +695,16 @@ function renderCombo(){
                 (p.disponible ? '' : ' disabled') + ' data-casillero="' + s + '" data-op="' + esc(p.id) + '">' +
                 esc(nombreCorto(p)) + (p.disponible ? '' : ' · Agotado') + '</button>').join('') + '</div>'
             : '') +
-          (elegido ? '<div class="combo-elegido">' + esc(elegido.nombre) + (elegido.disponible ? '' : ' · Agotado') + '</div>' + tiraMediosHTML(elegido) : '') +
+          (elegido
+            ? '<div class="combo-elegido">' + esc(elegido.nombre) + '</div>' + tiraMediosHTML(elegido)
+            : (ops.length > 1 ? '<p class="nota-chica">Toca uno para ver todas sus fotos.</p>' : '')) +
           '</div>';
       }).join('') +
-      (st.completo
-        ? '<button type="button" class="btn btn-primario" data-combo-agregar="' + x.i + '">Agregar combo al carrito · ' + fmtPrecio(x.pr.valor) + '</button>'
-        : '<button type="button" class="btn" disabled>Agotado: mira los otros combos</button>') +
+      (!st.disponible
+        ? '<button type="button" class="btn" disabled>Agotado: mira los otros combos</button>'
+        : (st.completo
+          ? '<button type="button" class="btn btn-primario" data-combo-agregar="' + x.i + '">Agregar combo al carrito · ' + fmtPrecio(x.pr.valor) + '</button>'
+          : '<button type="button" class="btn" disabled>Elige ' + esc(falta.join(' y ')) + '</button>')) +
       '<p class="nota-chica" style="text-align:center">El precio de la promo se aplica solo en tu carrito.</p>' +
     '</div>';
 }
@@ -719,7 +733,9 @@ function promosSeccionHTML(ahora){
   if(!combos.length) return '';
   return '<section class="cat" id="promos"><h2 class="cat-titulo">Promociones</h2>' +
     '<p class="sub-desc">Toca un combo, elige tus productos (con sus fotos y videos) y agrégalo: el precio de la promo se aplica solo en tu carrito.</p>' +
-    '<div class="combos">' + combos.map(x => comboHTML(x, ahora)).join('') + '</div></section>';
+    // Los combos que ya no se pueden armar (algo agotado) van al final.
+    '<div class="combos">' + combos.map(x => ({x: x, ok: estadoCombo(x, ahora).disponible}))
+      .sort((a, b) => (b.ok - a.ok) || (a.x.i - b.x.i)).map(c => comboHTML(c.x, ahora)).join('') + '</div></section>';
 }
 // Botón llamativo del inicio cuando hay promos.
 function renderHeroPromo(ahora){
@@ -761,7 +777,7 @@ function renderGrilla(){
   const navMas = mas.length ? '<a href="#cat-mas-vendidos" data-cat="cat-mas-vendidos">Más vendidos</a>' : '';
   nav.innerHTML = (promosPrimero ? navPromos + navMas : navMas + navPromos) +
     grupos.map(g => '<a href="#' + esc(g.id) + '" data-cat="' + esc(g.id) + '">' + esc(g.nombre) + '</a>').join('') +
-    '<a href="#envios" data-cat="envios">Envíos y pagos</a><a href="#faq" data-cat="faq">Preguntas</a>';
+    '<a href="#envios" data-cat="envios">Envíos y pagos</a><a href="#clientes" data-cat="clientes">Clientes</a><a href="#faq" data-cat="faq">Preguntas</a>';
   main.innerHTML = (promosPrimero ? promosHTML + masHTML : masHTML + promosHTML) + grupos.map(g =>
     '<section class="cat" id="' + esc(g.id) + '">' +
     '<h2 class="cat-titulo">' + esc(g.nombre) + ' <span class="cat-cuenta">' + g.items.length + '</span></h2>' +
@@ -1510,7 +1526,10 @@ setInterval(() => {
     return;
   }
   document.querySelectorAll('[data-hasta]').forEach(el => {
-    el.textContent = fmtCuenta(Number(el.dataset.hasta) - ahora);
+    const ms = Number(el.dataset.hasta) - ahora;
+    el.textContent = fmtCuenta(ms);
+    // Menos de 24 horas: la cuenta se pone en rojo.
+    if(el.parentElement) el.parentElement.classList.toggle('cuenta-urgente', ms < 86400000);
   });
 }, 1000);
 
@@ -1593,6 +1612,69 @@ function renderTodo(){
 }
 
 /* ---------- Arranque ---------- */
+// Al entrar, la página empieza SIEMPRE arriba (el navegador a veces la dejaba
+// donde estaba la última vez, por ejemplo en las preguntas frecuentes).
+if('scrollRestoration' in history) history.scrollRestoration = 'manual';
+if(!location.hash) window.scrollTo(0, 0);
+
+// "Escríbenos": se elige WhatsApp o Instagram (Instagram abre directo el chat).
+document.getElementById('heroIg').href = urlInstagramChat();
+document.getElementById('escribenosBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  const menu = document.getElementById('escribenosMenu');
+  menu.hidden = !menu.hidden;
+  e.currentTarget.setAttribute('aria-expanded', String(!menu.hidden));
+});
+document.addEventListener('click', e => {
+  const menu = document.getElementById('escribenosMenu');
+  if(!menu.hidden && !e.target.closest('.escribenos')){
+    menu.hidden = true;
+    document.getElementById('escribenosBtn').setAttribute('aria-expanded', 'false');
+  }
+});
+
+// Preguntas frecuentes: al abrir una, se cierra la que estaba abierta.
+document.querySelectorAll('.faq details').forEach(d => d.addEventListener('toggle', () => {
+  if(d.open) document.querySelectorAll('.faq details[open]').forEach(o => { if(o !== d) o.open = false; });
+}));
+
+/* ---------- Clientes: carrusel que gira solo hacia la derecha ----------
+   Las fotos se ponen en config.js (CLIENTES_FOTOS). Se puede deslizar con el
+   dedo o el mouse; al soltar, sigue girando solo. */
+function renderClientes(){
+  const cont = document.getElementById('clientesCarrusel');
+  if(!cont) return;
+  const fotos = cfg.CLIENTES_FOTOS || [];
+  if(!fotos.length){
+    cont.innerHTML = '<div class="estado">Muy pronto: fotos de nuestros clientes con sus pedidos.</div>';
+    return;
+  }
+  // Dos vueltas iguales: al terminar una, se salta sin que se note a la otra.
+  const vuelta = fotos.map(f => '<img loading="lazy" src="' + esc(f) + '" alt="Pedido entregado a un cliente">').join('');
+  cont.innerHTML = '<div class="clientes-pista" id="clientesPista">' + vuelta + vuelta + '</div>';
+  const pista = document.getElementById('clientesPista');
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let pausa = false, reanudar = null;
+  const parar = () => { pausa = true; clearTimeout(reanudar); };
+  const seguir = () => { clearTimeout(reanudar); reanudar = setTimeout(() => { pausa = false; }, 2500); };
+  ['pointerdown', 'touchstart', 'wheel', 'mouseenter'].forEach(ev => pista.addEventListener(ev, parar, {passive: true}));
+  ['pointerup', 'touchend', 'mouseleave'].forEach(ev => pista.addEventListener(ev, seguir, {passive: true}));
+  let previo = null;
+  const paso = t => {
+    const mitad = pista.scrollWidth / 2;
+    if(previo !== null && !pausa && mitad > pista.clientWidth){
+      // Hacia la derecha = el contenido avanza a la derecha (scroll hacia atrás).
+      pista.scrollLeft -= (t - previo) * 0.04;
+      if(pista.scrollLeft <= 1) pista.scrollLeft += mitad;
+    }
+    previo = t;
+    requestAnimationFrame(paso);
+  };
+  pista.scrollLeft = pista.scrollWidth / 2;
+  requestAnimationFrame(paso);
+}
+renderClientes();
+
 document.getElementById('pieInstagram').href = urlInstagram();
 document.getElementById('heroWa').href = urlWhatsApp('¡Hola Timeless! Quiero consultar por un producto');
 if(cfg.TIKTOK_USUARIO){

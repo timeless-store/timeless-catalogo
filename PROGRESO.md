@@ -127,3 +127,14 @@
 - **Acento azul**, logo en la cabecera, **pantalla de carga negra con el logo**, íconos con la T más grande.
 - **Libro de Reclamaciones**: datos del proveedor listos; falta el link del Google Forms (`LIBRO_RECLAMACIONES_FORM`).
 - **Arma tu combo** (18-oct): cada combo muestra la foto del Canva (`Foto` en promos.csv, archivos en `img/promos/`) y abre su hoja: el cliente elige el color y el collar, ve las fotos y videos de lo elegido, y lo agrega con un toque. El combo de pant chain es solo con la Skeleton.
+
+## 12. Correcciones desde PC (18 de octubre, noche)
+
+- Combos: al abrirlos no hay nada elegido (se ve la foto completa del combo); al elegir, aparecen TODAS las fotos y videos de ese producto, sin recortes. Si un casillero tiene una sola opción, va elegida sola. Un combo que no se puede armar va al final.
+- Cuenta regresiva en rojo cuando quedan menos de 24 horas.
+- "Escríbenos" deja elegir WhatsApp o Instagram (Instagram abre directo el chat).
+- La página siempre empieza arriba al entrar.
+- Sección **Clientes** (carrusel que gira solo hacia la derecha; fotos en `CLIENTES_FOTOS` de `config.js`).
+- Preguntas frecuentes: textos corregidos (cambios en 48 horas, vuelto, huecos, envío gratis) y una abierta a la vez.
+- **Azul marino**; títulos con letra gótica (Grenze Gotisch) y texto en Montserrat (la del logo).
+- Pant chains: "Aleación reforzada de alta calidad". Collares agotados en el orden de Alberto.
