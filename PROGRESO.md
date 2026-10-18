@@ -107,3 +107,12 @@
 - **Oferta en agotados**: como máximo 2 días; después vuelve a su precio normal. El envío gratis sí se muestra en agotados.
 - **Instagram**: el botón del carrito abre directo el chat de la tienda.
 - Envíos en dos columnas (InDrive debajo de Recojo); fotos de tarjetas siempre cuadradas.
+
+## 10. Lista automática del dashboard (18 de octubre)
+
+- La página lee la **lista pública del dashboard** (`CSV_ESTADO` en `config.js`): una hoja aparte con solo nombre, estado y puesto de best seller. El Sheets de ventas sigue privado. Esa lista manda sobre `Disponible` y `BestSeller`; si no carga, se usa la última guardada o `productos.csv`.
+- Columna **`NombreInventario`** para los nombres distintos al inventario (Púas Punk y el par de anillos, que en el inventario son dos filas: se vende el par, así que vale el estado más bajo de las dos).
+- Un teaser a mano (`Disponible` = PRONTO y `Visible` = SI) se muestra aunque la lista diga "oculto".
+- **Más vendidos**: máximo 6; los que tienen "Restock en camino" se quedan con esa etiqueta.
+- Un agotado no muestra una oferta sin fecha de fin.
+- En PC, las fotos de cada tarjeta van cambiando al pasar el cursor.

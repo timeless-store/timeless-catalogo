@@ -14,6 +14,14 @@ const CATALOGO_CONFIG = {
   // sin costos, y antes se consulta con el chat del dashboard.
   CSV_PRODUCTOS: 'productos.csv',
 
+  // Lista pública que arma el dashboard (18-oct-2026): SOLO nombre, estado
+  // ("en stock", "quedan pocos", "restock en camino", "agotado", "oculto") y
+  // puesto de best seller. Es una hoja APARTE, sin costos ni cantidades; el
+  // Sheets de ventas sigue privado. Manda sobre las columnas Disponible y
+  // BestSeller de productos.csv. Si no carga, se usa productos.csv tal cual.
+  // Nombres distintos al inventario: columna "NombreInventario" de productos.csv.
+  CSV_ESTADO: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS7n4RPZuRsT3npjH1tL8WxN5PPZrv87Yj815p8UKa0uboP8fFyvj7T9HD3fPiJBagUrR--AqJ6zzrr/pub?gid=0&single=true&output=csv',
+
   // Número de WhatsApp del negocio (el mismo del catálogo de Canva). Va con
   // código de país y sin espacios ni "+".
   WHATSAPP_NUMERO: '51960612770',

@@ -155,6 +155,12 @@ function filasAProductos(rows){
       // Visible = NO: el producto no sale en la página (ej. un lanzamiento que
       // todavía no se anuncia). Vacío = sí se ve.
       visible: ['no', 'oculto', '0', 'false', 'falso'].indexOf(norm(col(r, 'visible'))) === -1,
+      // Visible = SI escrito a mano: se muestra aunque la lista del dashboard
+      // diga "oculto" (ej. el teaser de un lanzamiento con Disponible = PRONTO).
+      visibleSi: esSi(col(r, 'visible')),
+      // Nombre(s) en el inventario del dashboard, si son distintos ("A|B" si
+      // este producto junta varias filas, como el par de anillos).
+      inventario: col(r, 'nombreinventario').split('|').map(s => s.trim()).filter(Boolean),
       material: col(r, 'material'),
       coleccion: col(r, 'coleccion'),
       cuidado: col(r, 'cuidado'),
@@ -166,8 +172,48 @@ function filasAProductos(rows){
       linea: col(r, 'linea'),
     });
   });
-  // Un producto sin precio no se puede mostrar ni vender; uno oculto, tampoco.
-  return out.filter(p => p.precio > 0 && p.visible);
+  // Un producto sin precio no se puede mostrar ni vender. Los ocultos se
+  // filtran después, cuando ya se aplicó la lista del dashboard.
+  return out.filter(p => p.precio > 0);
+}
+
+/* ---------- Lista de estado del dashboard (CSV_ESTADO) ----------
+   Por producto: Estado y puesto de BestSeller. Manda sobre productos.csv.
+   Solo trae nombre, estado y puesto: nada de costos, cantidades ni ventas. */
+const ESTADO_KEY = 'timeless_catalogo_estado';
+const RANGO_ESTADO = {'en stock': 0, 'quedan pocos': 1, 'restock en camino': 2, 'agotado': 3, 'oculto': 4};
+let sinEmpatar = [];   // productos que no se encontraron en la lista (para revisar)
+function aplicarEstado(productos, filas){
+  sinEmpatar = [];
+  if(!filas || filas.length < 2) return;
+  const idx = {};
+  filas[0].forEach((h, i) => { idx[norm(h)] = i; });
+  const celda = (r, k) => String(idx[k] == null ? '' : (r[idx[k]] == null ? '' : r[idx[k]])).trim();
+  const mapa = {};
+  filas.slice(1).forEach(r => {
+    const n = norm(celda(r, 'producto'));
+    if(n) mapa[n] = {estado: norm(celda(r, 'estado')), puesto: parseInt(celda(r, 'bestseller'), 10) || 0};
+  });
+  productos.forEach(p => {
+    const nombres = p.inventario.length ? p.inventario : [p.nombre];
+    const suyas = nombres.map(n => mapa[norm(n)]).filter(Boolean);
+    if(suyas.length !== nombres.length || suyas.some(f => !(f.estado in RANGO_ESTADO))){
+      sinEmpatar.push(p.nombre);
+      return;   // se queda con lo que dice productos.csv
+    }
+    // Si junta varias filas (el par de anillos), se vende completo: manda la peor.
+    const est = suyas.reduce((a, f) => RANGO_ESTADO[f.estado] > RANGO_ESTADO[a] ? f.estado : a, 'en stock');
+    if(!(p.proximamente && p.visibleSi)){
+      p.disponible = est === 'en stock' || est === 'quedan pocos';
+      p.pocos = est === 'quedan pocos';
+      p.restock = est === 'restock en camino';
+      p.proximamente = false;
+      p.visible = p.visible && (est !== 'oculto' || p.visibleSi);
+    }
+    const puestos = suyas.map(f => f.puesto).filter(n => n > 0);
+    p.bestSeller = puestos.length ? Math.min.apply(null, puestos) : 0;
+  });
+  if(sinEmpatar.length) console.warn('Productos que no están en la lista del dashboard:', sinEmpatar.join(', '));
 }
 
 // Arma lo que se pinta en la grilla: cada producto suelto es una entrada, y las
@@ -254,6 +300,9 @@ function rangoEstado(e){ return e.disponible ? 0 : (e.proximamente ? 1 : (e.rest
 //   a regalar un descuento por un error de tipeo.
 function ofertaActiva(p, ahora){
   if(!(p.precioOferta > 0 && p.precioOferta < p.precio)) return false;
+  // Un agotado no muestra una oferta sin fecha de fin: así nadie espera que
+  // vuelva a ese precio. Con fecha (máx. 2 días después de agotarse), sí.
+  if(!p.disponible && p.ofertaHasta === null) return false;
   if(p.ofertaHasta === null) return true;
   if(isNaN(p.ofertaHasta)) return false;
   return ahora < p.ofertaHasta;
@@ -386,12 +435,25 @@ function saveCache(rows, key){
 }
 
 function usarFilas(rows){
-  PRODUCTOS = filasAProductos(rows);
+  const todos = filasAProductos(rows);
+  aplicarEstado(todos, FILAS_ESTADO);
+  PRODUCTOS = todos.filter(p => p.visible);
   POR_ID = {};
   PRODUCTOS.forEach(p => { POR_ID[p.id] = p; });
   construirEntradas();
   firmaOfertas = calcFirma(Date.now());
   renderTodo();
+}
+
+// La lista de estado del dashboard es opcional: si no carga, se usa la última
+// que vio este celular y, si no hay, lo que diga productos.csv.
+let FILAS_ESTADO = null;
+function cargarEstado(){
+  if(!cfg.CSV_ESTADO) return Promise.resolve();
+  return fetchCSV(cfg.CSV_ESTADO).then(rows => {
+    saveCache(rows, ESTADO_KEY);
+    FILAS_ESTADO = rows;
+  }).catch(() => { FILAS_ESTADO = loadCache(ESTADO_KEY); });
 }
 
 // Las promos son opcionales: si no cargan, la página funciona igual sin ellas.
@@ -412,7 +474,7 @@ function cargar(){
     estado.textContent = 'Falta configurar CSV_PRODUCTOS en config.js.';
     return;
   }
-  const promosListas = cargarPromos();
+  const promosListas = Promise.all([cargarPromos(), cargarEstado()]);
   fetchCSV(cfg.CSV_PRODUCTOS).then(rows => {
     saveCache(rows);
     return promosListas.then(() => usarFilas(rows));
@@ -488,7 +550,7 @@ function tarjetaHTML(e, ahora){
     ? '<div class="variantes-txt">' + esc(e.variantes.map(v => v.variante || v.nombre).join(' · ')) + '</div>'
     : (grupo && grupo.variantes.length > 1 ? '<div class="variantes-txt">También en ' + esc(grupo.variantes.filter(v => v !== p).map(v => v.variante || v.nombre).join(' · ')) + '</div>' : '');
   return '<a class="prod' + (apagado ? ' agotado' : '') + '" href="#/p/' + esc(e.id) + '">' +
-    '<div class="prod-foto"><img loading="lazy" src="' + esc(fotoEntrada(e)) + '" alt="' + esc(e.nombre) + '">' +
+    '<div class="prod-foto"><img loading="lazy" src="' + esc(fotoEntrada(e)) + '" data-fotos="' + esc(e.fotos.filter(f => !esVideo(f)).slice(0, 5).join('|')) + '" alt="' + esc(e.nombre) + '">' +
     '<div class="tags">' + tags + '</div></div>' +
     '<div class="prod-info">' + etiquetasHTML(e) + '<div class="prod-nombre">' + esc(e.nombre) + '</div>' + opciones +
     preciosHTML(p, ahora) +
@@ -508,11 +570,11 @@ function renderGrilla(){
     main.innerHTML = '<div class="estado">Todavía no hay productos en el catálogo.</div>';
     return;
   }
-  // "Más vendidos": los marcados en la columna BestSeller (1 = primero), máximo 10.
-  // Un best seller agotado sale de la fila hasta que vuelva, y entra el siguiente
-  // de la lista (ej. el puesto 11 es el reemplazo).
-  const MAS_VENDIDOS_MAX = 10;
-  const mas = TARJETAS.filter(e => e.bestSeller && e.disponible)
+  // "Más vendidos": los que tienen puesto de BestSeller (1 = primero), máximo 6.
+  // Un agotado sale de la fila y entra el siguiente; uno con "Restock en camino"
+  // se queda en su puesto con esa etiqueta, para que la gente sepa que vuelve.
+  const MAS_VENDIDOS_MAX = 6;
+  const mas = TARJETAS.filter(e => e.bestSeller && (e.disponible || e.restock))
     .sort((a, b) => a.bestSeller - b.bestSeller).slice(0, MAS_VENDIDOS_MAX);
   const masHTML = mas.length
     ? '<section class="cat" id="cat-mas-vendidos"><h2 class="cat-titulo">Más vendidos</h2>' +
@@ -547,6 +609,33 @@ document.getElementById('catsNav').addEventListener('click', e => {
   const sec = document.getElementById(a.dataset.cat);
   if(sec) sec.scrollIntoView();
 });
+/* ---------- Fotos que van cambiando al pasar el cursor (solo en PC) ----------
+   En celular no: ahí se toca la tarjeta para entrar a la ficha, y que todas las
+   tarjetas roten solas gastaría datos y distrae. */
+let rotaImg = null, rotaTimer = null;
+function pararRotacion(){
+  clearInterval(rotaTimer);
+  rotaTimer = null;
+  if(rotaImg){ rotaImg.src = rotaImg.dataset.fotos.split('|')[0] || rotaImg.src; rotaImg = null; }
+}
+if(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches){
+  document.addEventListener('mouseover', e => {
+    const card = e.target.closest('.prod');
+    const img = card ? card.querySelector('img[data-fotos]') : null;
+    if(img === rotaImg) return;
+    pararRotacion();
+    if(!img) return;
+    const fotos = img.dataset.fotos.split('|').filter(Boolean);
+    if(fotos.length < 2) return;
+    rotaImg = img;
+    fotos.slice(1).forEach(f => { new Image().src = f; });   // las deja listas
+    let i = 0;
+    const siguiente = () => { i = (i + 1) % fotos.length; img.src = fotos[i]; };
+    siguiente();                          // apenas entra el cursor, pasa a la 2
+    rotaTimer = setInterval(siguiente, 1200);
+  });
+}
+
 document.getElementById('marcaLink').addEventListener('click', e => {
   e.preventDefault();
   window.scrollTo(0, 0);
