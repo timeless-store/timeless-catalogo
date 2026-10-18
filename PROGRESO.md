@@ -126,3 +126,4 @@
 - **Preguntas frecuentes** (tiempos, pagos, separar, tallas, materiales, cambios, fallas, envío gratis).
 - **Acento azul**, logo en la cabecera, **pantalla de carga negra con el logo**, íconos con la T más grande.
 - **Libro de Reclamaciones**: datos del proveedor listos; falta el link del Google Forms (`LIBRO_RECLAMACIONES_FORM`).
+- **Arma tu combo** (18-oct): cada combo muestra la foto del Canva (`Foto` en promos.csv, archivos en `img/promos/`) y abre su hoja: el cliente elige el color y el collar, ve las fotos y videos de lo elegido, y lo agrega con un toque. El combo de pant chain es solo con la Skeleton.

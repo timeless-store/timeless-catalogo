@@ -360,6 +360,7 @@ function filasAPromos(rows){
     hasta: parseFechaLima(col(r, 'hasta')),
     activa: esSi(col(r, 'activa')),
     texto: col(r, 'texto'),
+    foto: col(r, 'foto'),   // foto del combo (la del Canva), opcional
   })).filter(pr => pr.nombre && pr.alcance.length && pr.valor > 0);
 }
 function promoActiva(pr, ahora){
@@ -617,59 +618,90 @@ function fotoPropia(p){
   const f = e && e.juntos ? e.fotos[p.indiceFoto] : null;
   return f && !esVideo(f) ? f : fotoDe(p);
 }
-function comboHTML(x, ahora){
+// Estado de un combo: sus casilleros, lo elegido en cada uno (si lo elegido se
+// agotó, pasa a la primera opción que haya), el precio normal y el envío gratis.
+function estadoCombo(x, ahora){
   const casilleros = x.pr.alcance.map(opcionesCasillero);
   const sel = comboSel[x.i] = casilleros.map((ops, s) => {
     const previo = (comboSel[x.i] || [])[s];
     const ok = ops.find(p => p.id === previo && p.disponible);
     return ok ? ok.id : ((ops.find(p => p.disponible) || {}).id || null);
   });
-  const completo = sel.every(Boolean);
   const elegidos = sel.map(id => POR_ID[id]).filter(Boolean);
-  const normal = elegidos.reduce((a, p) => a + precioVigente(p, ahora), 0);
-  const gratis = elegidos.some(p => p.envioGratis);
-  // Una foto por casillero, lado a lado: la del producto elegido (cambia al elegir).
-  const fotosCombo = casilleros.map((ops, s) => fotoPropia(POR_ID[sel[s]] || ops[0]));
-  return '<div class="combo' + (completo ? '' : ' combo-agotado') + '">' +
-    '<div class="combo-foto">' + fotosCombo.map(f => '<img loading="lazy" src="' + esc(f) + '" alt="">').join('') + '</div>' +
+  return {casilleros: casilleros, sel: sel, completo: sel.every(Boolean),
+          normal: elegidos.reduce((a, p) => a + precioVigente(p, ahora), 0),
+          gratis: elegidos.some(p => p.envioGratis)};
+}
+// Tarjeta del combo en la página: la foto del combo (la del Canva), precio y "Arma tu combo".
+function comboHTML(x, ahora){
+  const st = estadoCombo(x, ahora);
+  const foto = x.pr.foto || fotoPropia(POR_ID[st.sel[0]] || (st.casilleros[0] || [])[0]);
+  return '<a class="combo' + (st.completo ? '' : ' combo-agotado') + '" href="#/combo/' + x.i + '">' +
+    '<div class="combo-foto"><img loading="lazy" src="' + esc(foto) + '" alt="' + esc(x.pr.nombre) + '"></div>' +
     '<div class="combo-cuerpo">' +
       '<div class="combo-nombre">' + esc(x.pr.nombre) + '</div>' +
-      '<div class="precios"><span class="precio-oferta combo-precio">' + fmtPrecio(x.pr.valor) + '</span>' +
-        (completo && normal > x.pr.valor ? '<span class="precio-antes">' + fmtPrecio(normal) + '</span>' : '') + '</div>' +
-      (gratis ? '<div class="envio-gratis">Con envío gratis</div>' : '') +
+      '<div class="precios"><span class="precio-oferta combo-precio">' + fmtPrecio(x.pr.valor) + '</span></div>' +
+      (st.gratis ? '<div class="envio-gratis">Con envío gratis</div>' : '') +
       (x.pr.hasta ? '<div class="cuenta">Termina en <b class="mono" data-hasta="' + x.pr.hasta + '">' + fmtCuenta(x.pr.hasta - ahora) + '</b></div>' : '') +
-      casilleros.map((ops, s) => '<div class="variantes-titulo combo-titulo">' + esc(ELIGE[norm(ops[0] ? ops[0].categoria : '')] || 'Elige uno') + '</div>' +
-        '<div class="chips">' + ops.map(p => '<button type="button" class="chip' + (p.id === sel[s] ? ' activo' : '') + (p.disponible ? '' : ' agotado') + '"' +
-          (p.disponible ? '' : ' disabled') + ' data-combo="' + x.i + '" data-casillero="' + s + '" data-op="' + esc(p.id) + '">' +
-          esc(nombreCorto(p)) + (p.disponible ? '' : ' · Agotado') + '</button>').join('') + '</div>').join('') +
-      (completo
-        ? '<button type="button" class="btn btn-primario" data-combo-agregar="' + x.i + '">Agregar combo al carrito</button>'
+      (st.completo ? '<span class="btn btn-primario">Arma tu combo</span>' : '<span class="btn" aria-disabled="true">Agotado: mira los otros combos</span>') +
+    '</div></a>';
+}
+// Fotos y videos de un producto, en una tira que se desliza.
+function tiraMediosHTML(p){
+  const medios = (p.fotos.length ? p.fotos : fotoEntradaLista(p)).slice(0, 12);
+  return '<div class="combo-tira">' + medios.map(f => esVideo(f)
+    ? '<video src="' + esc(f) + '#t=0.1" controls muted playsinline preload="metadata"></video>'
+    : '<img loading="lazy" src="' + esc(f) + '" alt="' + esc(p.nombre) + '">').join('') + '</div>';
+}
+function fotoEntradaLista(p){ const e = ENTRADA_POR_ID[p.id]; return e && e.fotos.length ? e.fotos : [FOTO_VACIA]; }
+
+// "Arma tu combo": se abre en su propia hoja (#/combo/N).
+let comboAbierto = null;
+function renderCombo(){
+  const ahora = Date.now();
+  const body = document.getElementById('comboBody');
+  const x = combosActivos(ahora).find(c => c.i === comboAbierto);
+  if(!x){
+    body.innerHTML = '<div class="sheet-pad"><h2>Promoción</h2><div class="estado">Esta promoción ya terminó.</div>' +
+      '<button type="button" class="btn" data-cerrar>Ver el catálogo</button></div>';
+    return;
+  }
+  const st = estadoCombo(x, ahora);
+  body.innerHTML =
+    (x.pr.foto ? '<div class="galeria"><img class="combo-portada" src="' + esc(x.pr.foto) + '" alt="' + esc(x.pr.nombre) + '"></div>' : '') +
+    '<div class="sheet-pad">' +
+      '<div class="eyebrow">Promoción</div>' +
+      '<h2>' + esc(x.pr.nombre) + '</h2>' +
+      '<div class="ficha-precios"><div class="precios"><span class="precio-oferta">' + fmtPrecio(x.pr.valor) + '</span>' +
+        (st.completo && st.normal > x.pr.valor ? '<span class="precio-antes">' + fmtPrecio(st.normal) + '</span>' : '') + '</div></div>' +
+      (st.gratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Con envío gratis</div>' : '') +
+      (x.pr.hasta ? '<div class="cuenta ficha-cuenta">Termina en <b class="mono" data-hasta="' + x.pr.hasta + '">' + fmtCuenta(x.pr.hasta - ahora) + '</b></div>' : '') +
+      st.casilleros.map((ops, s) => {
+        const elegido = POR_ID[st.sel[s]] || ops[0];
+        const titulo = ops.length > 1 ? (ELIGE[norm(ops[0] ? ops[0].categoria : '')] || 'Elige uno') : 'Incluye';
+        return '<div class="combo-paso"><div class="variantes-titulo">' + (s + 1) + '. ' + esc(titulo) + '</div>' +
+          (ops.length > 1
+            ? '<div class="chips">' + ops.map(p => '<button type="button" class="chip' + (p.id === st.sel[s] ? ' activo' : '') + (p.disponible ? '' : ' agotado') + '"' +
+                (p.disponible ? '' : ' disabled') + ' data-casillero="' + s + '" data-op="' + esc(p.id) + '">' +
+                esc(nombreCorto(p)) + (p.disponible ? '' : ' · Agotado') + '</button>').join('') + '</div>'
+            : '') +
+          (elegido ? '<div class="combo-elegido">' + esc(elegido.nombre) + (elegido.disponible ? '' : ' · Agotado') + '</div>' + tiraMediosHTML(elegido) : '') +
+          '</div>';
+      }).join('') +
+      (st.completo
+        ? '<button type="button" class="btn btn-primario" data-combo-agregar="' + x.i + '">Agregar combo al carrito · ' + fmtPrecio(x.pr.valor) + '</button>'
         : '<button type="button" class="btn" disabled>Agotado: mira los otros combos</button>') +
-    '</div></div>';
+      '<p class="nota-chica" style="text-align:center">El precio de la promo se aplica solo en tu carrito.</p>' +
+    '</div>';
 }
-function promosSeccionHTML(ahora){
-  const combos = combosActivos(ahora);
-  if(!combos.length) return '';
-  return '<section class="cat" id="promos"><h2 class="cat-titulo">Promociones</h2>' +
-    '<p class="sub-desc">Elige tu combo y agrégalo: el precio de la promo se aplica solo en tu carrito.</p>' +
-    '<div class="combos">' + combos.map(x => comboHTML(x, ahora)).join('') + '</div></section>';
-}
-// Botón llamativo del inicio cuando hay promos.
-function renderHeroPromo(ahora){
-  const el = document.getElementById('heroPromo');
-  if(!el) return;
-  const combos = combosActivos(ahora);
-  if(!combos.length){ el.innerHTML = ''; return; }
-  const fines = combos.map(x => x.pr.hasta).filter(h => h && !isNaN(h));
-  el.innerHTML = '<a class="hero-promo" href="#promos" data-scroll="promos"><span class="hero-promo-titulo">🔥 Promos disponibles</span>' +
-    '<span class="hero-promo-sub">' + (fines.length ? 'Hasta el ' + fechaCortaLima(Math.min.apply(null, fines)) + ' · ' : '') + 'Ver promos →</span></a>';
-}
-document.getElementById('catalogo').addEventListener('click', e => {
+document.getElementById('comboBody').addEventListener('click', e => {
   const op = e.target.closest('[data-op]');
-  if(op){
-    const i = Number(op.dataset.combo), s = Number(op.dataset.casillero);
-    (comboSel[i] = comboSel[i] || [])[s] = op.dataset.op;
-    renderGrilla();
+  if(op && comboAbierto !== null){
+    (comboSel[comboAbierto] = comboSel[comboAbierto] || [])[Number(op.dataset.casillero)] = op.dataset.op;
+    const sheet = document.querySelector('#comboOverlay .sheet');
+    const top = sheet.scrollTop;
+    renderCombo();
+    sheet.scrollTop = top;
     return;
   }
   const add = e.target.closest('[data-combo-agregar]');
@@ -682,6 +714,23 @@ document.getElementById('catalogo').addEventListener('click', e => {
     }
   }
 });
+function promosSeccionHTML(ahora){
+  const combos = combosActivos(ahora);
+  if(!combos.length) return '';
+  return '<section class="cat" id="promos"><h2 class="cat-titulo">Promociones</h2>' +
+    '<p class="sub-desc">Toca un combo, elige tus productos (con sus fotos y videos) y agrégalo: el precio de la promo se aplica solo en tu carrito.</p>' +
+    '<div class="combos">' + combos.map(x => comboHTML(x, ahora)).join('') + '</div></section>';
+}
+// Botón llamativo del inicio cuando hay promos.
+function renderHeroPromo(ahora){
+  const el = document.getElementById('heroPromo');
+  if(!el) return;
+  const combos = combosActivos(ahora);
+  if(!combos.length){ el.innerHTML = ''; return; }
+  const fines = combos.map(x => x.pr.hasta).filter(h => h && !isNaN(h));
+  el.innerHTML = '<a class="hero-promo" href="#promos" data-scroll="promos"><span class="hero-promo-titulo">🔥 Promos disponibles</span>' +
+    '<span class="hero-promo-sub">' + (fines.length ? 'Hasta el ' + fechaCortaLima(Math.min.apply(null, fines)) + ' · ' : '') + 'Ver promos →</span></a>';
+}
 
 function renderGrilla(){
   const ahora = Date.now();
@@ -1380,6 +1429,7 @@ function ruta(){
   const h = location.hash;
   const fichaOv = document.getElementById('fichaOverlay');
   const carritoOv = document.getElementById('carritoOverlay');
+  const comboOv = document.getElementById('comboOverlay');
   let abierto = null;
   let indiceNuevo = 0;
   fichaEntradaId = h.indexOf('#/p/') === 0 ? fichaEntradaId : null;
@@ -1397,6 +1447,9 @@ function ruta(){
       }
       abierto = fichaOv;
     }
+  } else if(h.indexOf('#/combo/') === 0){
+    comboAbierto = Number(h.slice(8));
+    abierto = comboOv;
   } else if(h === '#/carrito'){
     abierto = carritoOv;
   }
@@ -1404,9 +1457,11 @@ function ruta(){
   // tiene ancho y puede saltar a la foto de la variante elegida.
   fichaOv.hidden = abierto !== fichaOv;
   carritoOv.hidden = abierto !== carritoOv;
+  comboOv.hidden = abierto !== comboOv;
   document.body.classList.toggle('sin-scroll', !!abierto);
   if(abierto === fichaOv) renderFicha(indiceNuevo);
   if(abierto === carritoOv) renderCarrito();
+  if(abierto === comboOv) renderCombo();
   if(abierto) abierto.querySelector('.sheet').scrollTop = 0;
 }
 function cerrarHoja(){
