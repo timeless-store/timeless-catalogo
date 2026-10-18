@@ -618,7 +618,7 @@ function renderFicha(indice){
   document.getElementById('fichaBody').innerHTML =
     '<div class="galeria"><div class="galeria-pista" id="galPista">' +
       medios.map((f, i) => esVideo(f)
-        ? '<video src="' + esc(f) + '#t=0.1" controls playsinline preload="metadata" aria-label="Video de ' + esc(e.nombre) + '"></video>'
+        ? '<video src="' + esc(f) + '#t=0.1" controls muted playsinline preload="metadata" aria-label="Video de ' + esc(e.nombre) + '"></video>'
         : '<img src="' + esc(f) + '" alt="' + esc(e.nombre) + ' — foto ' + (i + 1) + '">').join('') +
     '</div>' +
     (varias ? '<button type="button" class="galeria-nav galeria-prev" data-gal="-1" aria-label="Foto anterior">‹</button>' +
@@ -963,7 +963,7 @@ function toast(msg){
 // la página no se publique por descuido con datos de mentira o sin WhatsApp.
 function renderAvisoConfig(){
   const faltan = [];
-  if(!/^https?:\/\//.test(cfg.CSV_PRODUCTOS || '')) faltan.push('Los productos salen de una <b>copia de tu Canva</b> guardada en la página (todavía no se lee la hoja de Google) y <b>faltan las fotos</b>.');
+  if(!/^https?:\/\//.test(cfg.CSV_PRODUCTOS || '')) faltan.push('Los productos salen de una <b>copia de tu Canva</b> guardada en la página (todavía no se lee la hoja de Google) y <b>faltan fotos de algunos productos</b>.');
   if(!String(cfg.WHATSAPP_NUMERO || '').replace(/\D/g, '')) faltan.push('Falta el <b>número de WhatsApp</b>: el pedido se abre sin destinatario.');
   if(!cfg.TIKTOK_USUARIO) faltan.push('Falta el <b>usuario de TikTok</b>: el botón no aparece hasta ponerlo.');
   if(!cfg.INSTAGRAM_USUARIO) faltan.push('Falta el <b>usuario de Instagram</b>.');

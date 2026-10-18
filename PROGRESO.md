@@ -19,7 +19,8 @@
 - **Envío en el carrito**: el cliente elige recojo, motorizado o Shalom (opcional) y ve un costo aproximado. Si el pedido tiene envío gratis, todo cuesta 0.
 - "Avísame cuando vuelva" solo en agotados, por WhatsApp o Instagram.
 - Envíos y pagos al final, botón de Instagram y TikTok, Libro de Reclamaciones provisional.
-- Se puede instalar en el celular. Versión del caché: `timeless-catalogo-v6`.
+- **Fotos reales** en `fotos/<producto>/` (16 productos al 17 de octubre): primero las de persona, luego maniquí, luego mesa o en mano; los videos al final y siempre sin sonido.
+- Se puede instalar en el celular. Versión del caché: `timeless-catalogo-v8`.
 
 ## 2. Las hojas
 
