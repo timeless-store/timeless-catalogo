@@ -98,3 +98,12 @@
 - **Franja de campañas** (Cyber Wow, Black Friday): `FRANJA` en `config.js`. Vista de prueba: agregar `?franja=prueba` al link.
 - **Logo**: ícono de pestaña, ícono de la app y vista previa al compartir, sacados de una copia de "Bolsas de plástico 2026" (el original no se tocó). Copias del logo en la carpeta Branding.
 - **Fotos**: lo suelto en la carpeta de un producto va a la web; las subcarpetas (otras versiones) no. Excepción temporal: Cemetery Cross usa de portada la foto 2 de "Versión 2".
+
+## 9. Ajustes del 18 de octubre (noche)
+
+- `Disponible` acepta también **POCOS** ("Quedan pocos") y **RESTOCK** ("Restock en camino": agotado pero ya pedido).
+- **Más vendidos**: lista del chat del dashboard (últimos 60 días); se muestran hasta 10 disponibles y un agotado deja su lugar al siguiente.
+- **Colores**: si hay foto de todos juntos, una sola tarjeta; si no, una tarjeta por color, cada una con sus fotos y el selector para pasar al otro.
+- **Oferta en agotados**: como máximo 2 días; después vuelve a su precio normal. El envío gratis sí se muestra en agotados.
+- **Instagram**: el botón del carrito abre directo el chat de la tienda.
+- Envíos en dos columnas (InDrive debajo de Recojo); fotos de tarjetas siempre cuadradas.

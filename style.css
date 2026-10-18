@@ -201,6 +201,8 @@ button{font-family:inherit;}
 .prod-foto{
   position:relative;
   aspect-ratio:1/1;
+  overflow:hidden;
+  flex-shrink:0;
   background:var(--chip);
 }
 .prod-foto img{
@@ -208,6 +210,8 @@ button{font-family:inherit;}
   height:100%;
   object-fit:cover;
   display:block;
+  position:absolute;
+  inset:0;
 }
 .prod.agotado .prod-foto img{opacity:.45;filter:grayscale(1);}
 .tags{
@@ -244,6 +248,9 @@ button{font-family:inherit;}
 }
 .tag-oferta{background:var(--accent);color:#fff;}
 .tag-agotado{background:#111;color:#f2f0ea;border:1px solid #555;}
+.tag-restock{background:var(--warn);color:#111;}
+.tag-pocos{background:#111;color:var(--warn);border:1px solid var(--warn);}
+.pocos{margin-top:6px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);}
 .prod-info{padding:10px 12px 12px;display:flex;flex-direction:column;gap:4px;flex:1;}
 .prod-nombre{font-size:14px;font-weight:700;line-height:1.3;}
 .prod.agotado .prod-nombre{color:var(--muted);}
@@ -411,6 +418,7 @@ button{font-family:inherit;}
 
 /* ---------- Envíos y pagos ---------- */
 .envios{display:grid;grid-template-columns:1fr;gap:12px;align-items:start;}
+.envios-col{display:flex;flex-direction:column;gap:12px;}
 @media (min-width:760px){ .envios{grid-template-columns:repeat(2, minmax(0, 1fr));} }
 .envio-card{
   background:var(--card);

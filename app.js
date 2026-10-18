@@ -100,6 +100,7 @@ let PRODUCTOS = [];      // una fila del CSV = un producto vendible (con su prop
 let POR_ID = {};
 let ENTRADAS = [];       // lo que se ve en la grilla: un producto suelto, o un grupo de variantes (colores)
 let ENTRADA_POR_ID = {}; // id de entrada o de variante -> entrada
+let TARJETAS = [];       // lo que se pinta en la grilla (ver construirEntradas)
 let PROMOS = [];
 
 // Un enlace de Fotos que termine en .mp4/.webm/.mov se muestra como video.
@@ -122,9 +123,13 @@ function filasAProductos(rows){
     let id = slug(nombre) || 'producto';
     // Dos productos con el mismo nombre no pueden compartir identificador.
     if(usados[id]){ usados[id]++; id += '-' + usados[id]; } else usados[id] = 1;
-    // Disponible: SI (o vacío) = hay; NO = agotado; PRONTO = todavía no llega.
+    // Disponible: SI (o vacío) = hay; POCOS = hay, pero quedan pocos; NO = agotado;
+    // RESTOCK = agotado pero ya está pedido ("Restock en camino");
+    // PRONTO = producto nuevo que todavía no llega.
     const disp = norm(col(r, 'disponible'));
     const pronto = ['pronto', 'proximamente', 'proximo'].indexOf(disp) > -1;
+    const restock = ['restock', 'restock en camino', 'en camino'].indexOf(disp) > -1;
+    const pocos = ['pocos', 'quedan pocos'].indexOf(disp) > -1;
     // BestSeller: un número es su puesto en "Más vendidos" (1 = primero); SI = al final.
     const bs = col(r, 'bestseller');
     out.push({
@@ -135,8 +140,10 @@ function filasAProductos(rows){
       precioOferta: parseMoney(col(r, 'preciooferta')),
       ofertaHasta: parseFechaLima(col(r, 'ofertahasta')),
       // Solo se marca agotado con un NO explícito. Una celda vacía cuenta como disponible.
-      disponible: !pronto && ['no', 'agotado', '0', 'false', 'falso'].indexOf(disp) === -1,
+      disponible: !pronto && !restock && ['no', 'agotado', '0', 'false', 'falso'].indexOf(disp) === -1,
       proximamente: pronto,
+      restock: restock,
+      pocos: pocos,
       fotos: col(r, 'fotos').split(/[,\n]/).map(f => f.trim()).filter(Boolean),
       descripcion: col(r, 'descripcion'),
       tallas: col(r, 'tallas'),
@@ -188,31 +195,57 @@ function construirEntradas(){
   });
   ENTRADAS.forEach(e => {
     const v = e.variantes;
-    e.disponible = v.some(p => p.disponible);
-    e.proximamente = !e.disponible && v.some(p => p.proximamente);
-    e.nuevo = v.some(p => p.nuevo);
-    const puestos = v.map(p => p.bestSeller).filter(n => n > 0);
-    e.bestSeller = puestos.length ? Math.min.apply(null, puestos) : 0;
-    e.linea = (v.find(p => p.linea) || {}).linea || '';
-    e.material = (v.find(p => p.material) || {}).material || '';
-    e.coleccion = (v.find(p => p.coleccion) || {}).coleccion || '';
+    resumirEstado(e, v);
     // Fotos de la ficha: las de todas las variantes, sin repetir y en orden.
     // La foto "de los dos colores" va primero en la hoja y queda de portada.
     e.fotos = [];
     v.forEach(p => p.fotos.forEach(f => { if(e.fotos.indexOf(f) === -1) e.fotos.push(f); }));
+    // ¿Hay una foto con todos los colores juntos? Entonces el grupo es UNA
+    // tarjeta con esa foto de portada (ej. Black & White Spider, Gengar). Si no,
+    // cada color sale como su propia tarjeta y su ficha muestra solo sus fotos
+    // (con el selector para pasar al otro color).
+    const conFotos = v.filter(p => p.fotos.length);
+    e.juntos = v.length === 1 || (conFotos.length > 0 && conFotos.every(p => p.fotos[0] === e.fotos[0]));
     // Al elegir una variante, la galería salta a la primera foto que solo es suya.
     v.forEach(p => {
       const propia = p.fotos.find(f => !v.some(o => o !== p && o.fotos.indexOf(f) > -1));
-      p.indiceFoto = Math.max(0, e.fotos.indexOf(propia || p.fotos[0]));
+      p.indiceFoto = e.juntos ? Math.max(0, e.fotos.indexOf(propia || p.fotos[0])) : 0;
     });
   });
+  // Lo que se pinta en la grilla: una tarjeta por entrada, o una por color si
+  // el grupo no tiene foto de todos juntos. Cada tarjeta tiene la misma forma
+  // que una entrada (nombre, fotos, estado…) y su "id" es el del enlace.
+  TARJETAS = [];
+  ENTRADAS.forEach(e => {
+    if(e.juntos){ TARJETAS.push(e); return; }
+    e.variantes.forEach(p => {
+      const t = {id: p.id, nombre: p.nombre, categoria: p.categoria, variantes: [p],
+                 fotos: p.fotos.length ? p.fotos : e.fotos};
+      resumirEstado(t, [p]);
+      TARJETAS.push(t);
+    });
+  });
+}
+// Estado de una entrada o tarjeta a partir de sus variantes.
+function resumirEstado(e, v){
+  e.disponible = v.some(p => p.disponible);
+  e.proximamente = !e.disponible && v.some(p => p.proximamente);
+  e.restock = !e.disponible && !e.proximamente && v.some(p => p.restock);
+  e.pocos = e.disponible && v.filter(p => p.disponible).every(p => p.pocos);
+  e.nuevo = v.some(p => p.nuevo);
+  const puestos = v.map(p => p.bestSeller).filter(n => n > 0);
+  e.bestSeller = puestos.length ? Math.min.apply(null, puestos) : 0;
+  e.linea = (v.find(p => p.linea) || {}).linea || '';
+  e.material = (v.find(p => p.material) || {}).material || '';
+  e.coleccion = (v.find(p => p.coleccion) || {}).coleccion || '';
 }
 
 // Variante que representa a la entrada en la grilla: la primera con stock.
 function repVariante(e){
   return e.variantes.find(p => p.disponible) || e.variantes.find(p => p.proximamente) || e.variantes[0];
 }
-function rangoEstado(e){ return e.disponible ? 0 : (e.proximamente ? 1 : 2); }
+// Orden dentro de cada categoría: disponibles, próximamente, restock en camino, agotados.
+function rangoEstado(e){ return e.disponible ? 0 : (e.proximamente ? 1 : (e.restock ? 2 : 3)); }
 
 // ¿La oferta está vigente en este instante?
 // - Sin PrecioOferta (o si no es menor al precio normal): no hay oferta.
@@ -404,7 +437,7 @@ function cargar(){
 function agrupar(){
   const orden = (cfg.CATEGORIAS || []).map(norm);
   const grupos = {};
-  ENTRADAS.forEach((e, i) => {
+  TARJETAS.forEach((e, i) => {
     const k = norm(e.categoria);
     if(!grupos[k]) grupos[k] = {nombre: e.categoria, id: 'cat-' + slug(e.categoria), items: []};
     grupos[k].items.push({e: e, i: i});
@@ -441,19 +474,26 @@ function tarjetaHTML(e, ahora){
   // Un agotado solo dice "Agotado": anunciarlo como nuevo o en oferta sería prometer algo que no hay.
   let tags = '';
   if(e.proximamente) tags = '<span class="tag tag-nuevo">Próximamente</span>';
+  else if(e.restock) tags = '<span class="tag tag-restock">Restock en camino</span>';
   else if(!e.disponible) tags = '<span class="tag tag-agotado">Agotado</span>';
   else {
     if(e.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
     if(oferta) tags += '<span class="tag tag-oferta">Oferta</span>';
+    if(e.pocos) tags += '<span class="tag tag-pocos">Quedan pocos</span>';
   }
   const apagado = !e.disponible && !e.proximamente;
-  const opciones = e.variantes.length > 1 ? '<div class="variantes-txt">' + esc(e.variantes.map(v => v.variante || v.nombre).join(' · ')) + '</div>' : '';
+  // Un grupo en una sola tarjeta lista sus colores; una tarjeta de un color avisa que hay otros.
+  const grupo = ENTRADA_POR_ID[p.id];
+  const opciones = e.variantes.length > 1
+    ? '<div class="variantes-txt">' + esc(e.variantes.map(v => v.variante || v.nombre).join(' · ')) + '</div>'
+    : (grupo && grupo.variantes.length > 1 ? '<div class="variantes-txt">También en ' + esc(grupo.variantes.filter(v => v !== p).map(v => v.variante || v.nombre).join(' · ')) + '</div>' : '');
   return '<a class="prod' + (apagado ? ' agotado' : '') + '" href="#/p/' + esc(e.id) + '">' +
     '<div class="prod-foto"><img loading="lazy" src="' + esc(fotoEntrada(e)) + '" alt="' + esc(e.nombre) + '">' +
     '<div class="tags">' + tags + '</div></div>' +
     '<div class="prod-info">' + etiquetasHTML(e) + '<div class="prod-nombre">' + esc(e.nombre) + '</div>' + opciones +
     preciosHTML(p, ahora) +
-    (e.disponible && p.envioGratis ? '<div class="envio-gratis">Envío gratis</div>' : '') +
+    // El envío gratis se muestra también en agotados: así se sabe que vuelve con envío gratis.
+    (p.envioGratis ? '<div class="envio-gratis">Envío gratis</div>' : '') +
     (e.disponible ? cuentaHTML(p, ahora) : '') +
     '</div></a>';
 }
@@ -468,10 +508,12 @@ function renderGrilla(){
     main.innerHTML = '<div class="estado">Todavía no hay productos en el catálogo.</div>';
     return;
   }
-  // "Más vendidos": solo aparece si en la hoja hay productos marcados con BestSeller = SI.
-  // Van primero los que hay, y entre iguales, por su puesto (columna BestSeller).
-  const mas = ENTRADAS.filter(e => e.bestSeller)
-    .sort((a, b) => (rangoEstado(a) - rangoEstado(b)) || (a.bestSeller - b.bestSeller));
+  // "Más vendidos": los marcados en la columna BestSeller (1 = primero), máximo 10.
+  // Un best seller agotado sale de la fila hasta que vuelva, y entra el siguiente
+  // de la lista (ej. el puesto 11 es el reemplazo).
+  const MAS_VENDIDOS_MAX = 10;
+  const mas = TARJETAS.filter(e => e.bestSeller && e.disponible)
+    .sort((a, b) => a.bestSeller - b.bestSeller).slice(0, MAS_VENDIDOS_MAX);
   const masHTML = mas.length
     ? '<section class="cat" id="cat-mas-vendidos"><h2 class="cat-titulo">Más vendidos</h2>' +
       '<div class="fila">' + mas.map(e => tarjetaHTML(e, ahora)).join('') + '</div></section>'
@@ -723,12 +765,13 @@ function textoAviso(p){
     : '¡Hola Timeless! Quiero que me avisen cuando vuelva a haber stock de: ' + p.nombre;
 }
 function avisoHTML(p){
-  return '<button type="button" class="btn" disabled>' + (p.proximamente ? 'Próximamente' : 'Agotado') + '</button>' +
-    '<p class="aviso-titulo">' + (p.proximamente ? '¿Quieres que te avisemos cuando llegue?' : '¿Quieres que te avisemos cuando vuelva?') + '</p>' +
+  const estado = p.proximamente ? 'Próximamente' : (p.restock ? 'Restock en camino' : 'Agotado');
+  return '<button type="button" class="btn" disabled>' + estado + '</button>' +
+    '<p class="aviso-titulo">' + (p.proximamente || p.restock ? '¿Quieres que te avisemos cuando llegue?' : '¿Quieres que te avisemos cuando vuelva?') + '</p>' +
     '<a class="btn btn-wa" href="' + esc(urlWhatsApp(textoAviso(p))) + '" target="_blank" rel="noopener">Avísame por WhatsApp</a>' +
     (avisoCopiado === p.id
-      ? '<div class="copiado" style="margin-top:14px">✓ Mensaje copiado. Pégalo en nuestro chat de Instagram.</div>' +
-        '<a class="btn" href="' + esc(urlInstagram()) + '" target="_blank" rel="noopener">Abrir Instagram</a>'
+      ? '<div class="copiado" style="margin-top:14px">✓ Mensaje copiado. Pégalo en el chat que se abre.</div>' +
+        '<a class="btn" href="' + esc(urlInstagramChat()) + '" target="_blank" rel="noopener">Abrir chat de Instagram</a>'
       : '<button type="button" class="btn" data-aviso-ig="' + esc(p.id) + '">Avísame por Instagram</button>');
 }
 
@@ -746,7 +789,10 @@ function renderFicha(indice){
   const e = ENTRADA_POR_ID[fichaEntradaId];
   const p = POR_ID[fichaVarId];
   const ahora = Date.now();
-  const medios = e.fotos.length ? e.fotos : [FOTO_VACIA];
+  // Grupo con foto de todos juntos: todas las fotos. Si no, solo las del color elegido.
+  const fotos = e.juntos ? e.fotos : (p.fotos.length ? p.fotos : e.fotos);
+  const medios = fotos.length ? fotos : [FOTO_VACIA];
+  const titulo = e.juntos ? e.nombre : p.nombre;
   const varias = medios.length > 1;
   const dato = (titulo, valor) => valor ? '<div class="dato"><dt>' + titulo + '</dt><dd>' + esc(valor) + '</dd></div>' : '';
   const enCarrito = carrito[p.id] || 0;
@@ -766,19 +812,20 @@ function renderFicha(indice){
     '</div>' +
     '<div class="sheet-pad">' +
       '<div class="eyebrow">' + esc(e.categoria) + (e.nuevo && e.disponible ? ' · Nuevo' : '') + '</div>' +
-      '<h2>' + esc(e.nombre) + '</h2>' +
+      '<h2>' + esc(titulo) + '</h2>' +
       etiquetasHTML(e) +
       (linea && linea.descripcion ? '<p class="linea-desc"><b>' + esc(linea.titulo) + ':</b> ' + esc(linea.descripcion) + '</p>' : '') +
       (e.variantes.length > 1
         ? '<div class="variantes"><div class="variantes-titulo">Color</div><div class="chips">' +
           e.variantes.map(v => '<button type="button" class="chip' + (v.id === p.id ? ' activo' : '') + (v.disponible ? '' : ' agotado') +
             '" data-variante="' + esc(v.id) + '">' + esc(v.variante || v.nombre) +
-            (v.disponible ? '' : (v.proximamente ? ' · Próximamente' : ' · Agotado')) + '</button>').join('') +
+            (v.disponible ? '' : (v.proximamente ? ' · Próximamente' : (v.restock ? ' · En camino' : ' · Agotado'))) + '</button>').join('') +
           '</div></div>'
         : '') +
       '<div class="ficha-precios">' + preciosHTML(p, ahora) + '</div>' +
+      (p.disponible && p.pocos ? '<div class="pocos">Quedan pocos</div>' : '') +
       (p.disponible ? cuentaHTML(p, ahora, 'ficha-cuenta') : '') +
-      (p.disponible && p.envioGratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Envío gratis llevando este producto</div>' : '') +
+      (p.envioGratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Envío gratis llevando este producto</div>' : '') +
       (promos.length ? '<div class="promo-caja">' + promos.map(t => '<div>🏷 ' + esc(t) + '</div>').join('') + '</div>' : '') +
       '<dl class="datos">' +
         dato('Descripción y medidas', p.descripcion) +
@@ -922,8 +969,8 @@ function renderCarrito(){
       (copiadoOk
         ? '<div class="copiado">✓ Tu pedido ya está copiado</div>'
         : '<div class="copiado fallo">No pudimos copiarlo solo. Mantén presionado el texto de abajo y elige "Copiar".</div>') +
-      '<ol class="pasos"><li>Toca <b>Abrir Instagram</b>.</li><li>En nuestro perfil toca <b>Mensaje</b>.</li><li>Mantén presionado y elige <b>Pegar</b>. Envía.</li></ol>' +
-      '<a class="btn btn-primario" href="' + esc(urlInstagram()) + '" target="_blank" rel="noopener">Abrir Instagram (@' + esc(cfg.INSTAGRAM_USUARIO || '') + ')</a>' +
+      '<ol class="pasos"><li>Toca <b>Abrir chat de Instagram</b>: se abre directo nuestro chat.</li><li>Mantén presionado el cuadro de mensaje y elige <b>Pegar</b>. Envía.</li></ol>' +
+      '<a class="btn btn-primario" href="' + esc(urlInstagramChat()) + '" target="_blank" rel="noopener">Abrir chat de Instagram (@' + esc(cfg.INSTAGRAM_USUARIO || '') + ')</a>' +
       '<textarea class="pedido-texto" readonly id="pedidoTexto">' + esc(textoPedido()) + '</textarea>' +
       '<button type="button" class="btn-link" data-paso="canal">← Elegir otro medio</button>' +
       '</div>';
@@ -1000,6 +1047,12 @@ function renderCarrito(){
 
 function urlInstagram(){
   return 'https://www.instagram.com/' + encodeURIComponent(cfg.INSTAGRAM_USUARIO || '') + '/';
+}
+// Abre directo el chat (DM) con la tienda, no el perfil: así el cliente no se
+// distrae en el camino. Instagram no deja mandar el mensaje ya escrito (es una
+// regla de ellos), por eso el pedido se copia antes y el cliente solo lo pega.
+function urlInstagramChat(){
+  return 'https://ig.me/m/' + encodeURIComponent(cfg.INSTAGRAM_USUARIO || '');
 }
 function urlWhatsApp(texto){
   let num = String(cfg.WHATSAPP_NUMERO || '').replace(/\D/g, '');
@@ -1221,14 +1274,17 @@ function renderFranja(){
 function renderEnviosSeccion(){
   const cont = document.getElementById('enviosCards');
   if(!cont) return;
-  cont.innerHTML = (cfg.ENVIOS || []).map(x =>
+  // Dos columnas que se llenan hacia abajo: la tarjeta corta de recojo no deja
+  // hueco, y InDrive queda justo debajo de ella (pedido de Alberto).
+  const tarjetas = (cfg.ENVIOS || []).map(x =>
     '<div class="envio-card"><div class="envio-titulo">' + esc(x.nombre) + '</div>' +
     '<div class="envio-pago">' + esc(x.pago) + '</div><p>' + esc(x.texto) + '</p>' +
     (x.id === 'moto'
       ? '<label class="campo"><span>Cotiza tu envío</span><input id="distritoHome" list="listaDistritos" placeholder="Escribe o elige tu distrito" autocomplete="off" value="' + esc(distritoTxt) + '"></label>' +
         '<div id="cotizHome">' + cotizacionHTML(distritoTxt, false, false) + '</div>'
       : '') +
-    '</div>').join('');
+    '</div>');
+  cont.innerHTML = [0, 1].map(c => '<div class="envios-col">' + tarjetas.filter((t, i) => i % 2 === c).join('') + '</div>').join('');
   const lista = document.getElementById('listaDistritos');
   if(lista) lista.innerHTML = (cfg.DISTRITOS || []).map(d => '<option value="' + esc(d.n) + '">').join('');
   const inp = document.getElementById('distritoHome');

@@ -88,7 +88,7 @@ const CATALOGO_CONFIG = {
   // "Envíos y pagos"). "id" no se cambia: lo usa el código.
   ENVIOS: [
     {id: 'recojo', nombre: 'Recojo sin costo', pago: 'Pago contraentrega',
-     texto: 'En Plaza San Miguel o en Av. La Paz cdras. 6–8, San Miguel (zonas seguras). Coordinamos el día y la hora por chat.'},
+     texto: 'En Plaza San Miguel o en Av. La Paz cdras. 6–8, San Miguel. Coordinamos el día y la hora por chat.'},
     {id: 'moto', nombre: 'Delivery con motorizado', pago: 'Pago contraentrega · adelantas solo el envío',
      texto: 'A casi todo Lima Metropolitana, de lunes a sábado de 11am a 7pm. Elige tu distrito y te mostramos el costo aproximado (mínimo S/10). Adelantando el envío por Yape, tu pedido queda separado; el producto lo pagas al recibir.'},
     {id: 'indrive', nombre: 'Envío express por InDrive', pago: 'Pagas el producto antes · el envío al recibir',
