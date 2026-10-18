@@ -20,7 +20,7 @@
 - "Avísame cuando vuelva" solo en agotados, por WhatsApp o Instagram.
 - Envíos y pagos al final, botón de Instagram y TikTok, Libro de Reclamaciones provisional.
 - **Fotos reales** en `fotos/<producto>/` (29 de 36 productos al 18 de octubre): primero las de persona, luego maniquí, luego mesa o en mano; los videos al final y siempre sin sonido.
-- Se puede instalar en el celular. Versión del caché: `timeless-catalogo-v10`.
+- Se puede instalar en el celular. Versión del caché: `timeless-catalogo-v11`.
 
 ## 2. Las hojas
 
@@ -85,4 +85,4 @@
 - **Lista de productos según `Inventario Timeless.xlsx` (hoja Stocks)**: 36 productos. Se agregaron Black Cross Deluxe (Próximamente), White Chrome Hearts, Bullcore, Murciélago v2, Collar Angel y Demon Wings Duki y Lentes Chrome Hearts. No van "Collar punk" ni "Collar demon wings duki" (descontinuados).
 - **Disponible según el stock de ese día**: pasaron a disponibles Black Spider (llegó), Cinturón Chrome Hearts, Collar Gothic Cross y Collar de Púas Punk; pasaron a agotados White Cross Deluxe, Pant Chain Spiderboy y Anillos Duki.
 - Del Excel solo se leyeron nombre, precio de venta y stock. Nada de costos.
-- Pendiente de confirmar: precio del White Chrome Hearts (Alberto dijo S/75; el Excel dice S/40) y si los Lentes van.
+- Decisiones de Alberto (18 oct): Bullcore y White Chrome Hearts descontinuados para siempre (fuera del catálogo). Lentes Chrome Hearts fuera hasta que él lo pida. **Recordarle al terminar de pulir**: revisar qué productos se muestran (por ejemplo, el Collar Murciélago v2 no lo quiere visible, pero se guarda por si vuelve).
