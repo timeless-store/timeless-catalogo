@@ -125,6 +125,8 @@ function filasAProductos(rows){
     // Disponible: SI (o vacío) = hay; NO = agotado; PRONTO = todavía no llega.
     const disp = norm(col(r, 'disponible'));
     const pronto = ['pronto', 'proximamente', 'proximo'].indexOf(disp) > -1;
+    // BestSeller: un número es su puesto en "Más vendidos" (1 = primero); SI = al final.
+    const bs = col(r, 'bestseller');
     out.push({
       id: id,
       nombre: nombre,
@@ -142,7 +144,13 @@ function filasAProductos(rows){
       // Columnas opcionales: se marcan con SI. Vacío = no.
       nuevo: esSi(col(r, 'nuevo')),
       envioGratis: esSi(col(r, 'enviogratis')),
-      bestSeller: esSi(col(r, 'bestseller')),
+      bestSeller: /^\d+$/.test(bs) ? Number(bs) : (esSi(bs) ? 99 : 0),
+      // Visible = NO: el producto no sale en la página (ej. un lanzamiento que
+      // todavía no se anuncia). Vacío = sí se ve.
+      visible: ['no', 'oculto', '0', 'false', 'falso'].indexOf(norm(col(r, 'visible'))) === -1,
+      material: col(r, 'material'),
+      coleccion: col(r, 'coleccion'),
+      cuidado: col(r, 'cuidado'),
       // Variantes: dos filas con el mismo Grupo se muestran como UN producto
       // con selector de opción (ej. Collar Gengar: Morado / Plateado).
       grupo: col(r, 'grupo'),
@@ -151,8 +159,8 @@ function filasAProductos(rows){
       linea: col(r, 'linea'),
     });
   });
-  // Un producto sin precio no se puede mostrar ni vender.
-  return out.filter(p => p.precio > 0);
+  // Un producto sin precio no se puede mostrar ni vender; uno oculto, tampoco.
+  return out.filter(p => p.precio > 0 && p.visible);
 }
 
 // Arma lo que se pinta en la grilla: cada producto suelto es una entrada, y las
@@ -183,8 +191,11 @@ function construirEntradas(){
     e.disponible = v.some(p => p.disponible);
     e.proximamente = !e.disponible && v.some(p => p.proximamente);
     e.nuevo = v.some(p => p.nuevo);
-    e.bestSeller = v.some(p => p.bestSeller);
+    const puestos = v.map(p => p.bestSeller).filter(n => n > 0);
+    e.bestSeller = puestos.length ? Math.min.apply(null, puestos) : 0;
     e.linea = (v.find(p => p.linea) || {}).linea || '';
+    e.material = (v.find(p => p.material) || {}).material || '';
+    e.coleccion = (v.find(p => p.coleccion) || {}).coleccion || '';
     // Fotos de la ficha: las de todas las variantes, sin repetir y en orden.
     // La foto "de los dos colores" va primero en la hoja y queda de portada.
     e.fotos = [];
@@ -408,15 +419,20 @@ function agrupar(){
   }).map(k => grupos[k]);
 }
 
-// Separa una categoría en líneas (ej. Premium / Clásica) si la hoja las usa.
-function seccionesDe(items){
-  const lineas = cfg.LINEAS || [];
-  if(!lineas.length || !items.some(e => e.linea)) return [{items: items}];
-  const secs = lineas.map(l => ({titulo: l.titulo, desc: l.descripcion,
-    items: items.filter(e => norm(e.linea) === norm(l.clave))}));
-  const resto = items.filter(e => !lineas.some(l => norm(l.clave) === norm(e.linea)));
-  if(resto.length) secs.push({items: resto});
-  return secs.filter(s => s.items.length);
+// La línea (ej. Premium) con su título y descripción de config.js.
+function lineaDe(e){
+  if(!e.linea) return null;
+  return (cfg.LINEAS || []).find(l => norm(l.clave) === norm(e.linea)) || {titulo: 'Línea ' + e.linea, descripcion: ''};
+}
+// Etiquetas chicas sobre el nombre: línea, acero inoxidable y colección.
+// La de la línea muestra su descripción al pasar el cursor.
+function etiquetasHTML(e){
+  const out = [];
+  const l = lineaDe(e);
+  if(l) out.push('<span class="etq etq-linea"' + (l.descripcion ? ' data-tip="' + esc(l.descripcion) + '"' : '') + '>' + esc(l.titulo) + '</span>');
+  if(/^acero inoxidable/i.test(e.material)) out.push('<span class="etq">' + esc(/316l/i.test(e.material) ? 'Acero 316L' : 'Acero inoxidable') + '</span>');
+  if(e.coleccion) out.push('<span class="etq etq-col">' + esc(e.coleccion) + '</span>');
+  return out.length ? '<div class="etqs">' + out.join('') + '</div>' : '';
 }
 
 function tarjetaHTML(e, ahora){
@@ -435,7 +451,7 @@ function tarjetaHTML(e, ahora){
   return '<a class="prod' + (apagado ? ' agotado' : '') + '" href="#/p/' + esc(e.id) + '">' +
     '<div class="prod-foto"><img loading="lazy" src="' + esc(fotoEntrada(e)) + '" alt="' + esc(e.nombre) + '">' +
     '<div class="tags">' + tags + '</div></div>' +
-    '<div class="prod-info"><div class="prod-nombre">' + esc(e.nombre) + '</div>' + opciones +
+    '<div class="prod-info">' + etiquetasHTML(e) + '<div class="prod-nombre">' + esc(e.nombre) + '</div>' + opciones +
     preciosHTML(p, ahora) +
     (e.disponible && p.envioGratis ? '<div class="envio-gratis">Envío gratis</div>' : '') +
     (e.disponible ? cuentaHTML(p, ahora) : '') +
@@ -453,20 +469,20 @@ function renderGrilla(){
     return;
   }
   // "Más vendidos": solo aparece si en la hoja hay productos marcados con BestSeller = SI.
-  const mas = ENTRADAS.filter(e => e.bestSeller);
+  // Van primero los que hay, y entre iguales, por su puesto (columna BestSeller).
+  const mas = ENTRADAS.filter(e => e.bestSeller)
+    .sort((a, b) => (rangoEstado(a) - rangoEstado(b)) || (a.bestSeller - b.bestSeller));
   const masHTML = mas.length
     ? '<section class="cat" id="cat-mas-vendidos"><h2 class="cat-titulo">Más vendidos</h2>' +
       '<div class="fila">' + mas.map(e => tarjetaHTML(e, ahora)).join('') + '</div></section>'
     : '';
   nav.innerHTML = (mas.length ? '<a href="#cat-mas-vendidos" data-cat="cat-mas-vendidos">Más vendidos</a>' : '') +
-    grupos.map(g => '<a href="#' + esc(g.id) + '" data-cat="' + esc(g.id) + '">' + esc(g.nombre) + '</a>').join('');
+    grupos.map(g => '<a href="#' + esc(g.id) + '" data-cat="' + esc(g.id) + '">' + esc(g.nombre) + '</a>').join('') +
+    '<a href="#envios" data-cat="envios">Envíos y pagos</a>';
   main.innerHTML = masHTML + grupos.map(g =>
     '<section class="cat" id="' + esc(g.id) + '">' +
     '<h2 class="cat-titulo">' + esc(g.nombre) + ' <span class="cat-cuenta">' + g.items.length + '</span></h2>' +
-    seccionesDe(g.items).map(s =>
-      (s.titulo ? '<h3 class="sub-titulo">' + esc(s.titulo) + '</h3>' + (s.desc ? '<p class="sub-desc">' + esc(s.desc) + '</p>' : '') : '') +
-      '<div class="grilla">' + s.items.map(e => tarjetaHTML(e, ahora)).join('') + '</div>'
-    ).join('') +
+    '<div class="grilla">' + g.items.map(e => tarjetaHTML(e, ahora)).join('') + '</div>' +
     (cfg.FRASE_TALLA ? '<p class="frase-talla">' + esc(cfg.FRASE_TALLA) + '</p>' : '') +
     '</section>'
   ).join('');
@@ -503,6 +519,114 @@ if(typeof carrito !== 'object' || Array.isArray(carrito)) carrito = {};
 // Cómo quiere recibirlo el cliente (opcional). Vacío = "lo coordino por chat".
 let envioSel = '';
 try{ envioSel = localStorage.getItem(ENVIO_KEY) || ''; }catch(e){ envioSel = ''; }
+// Distrito para el delivery (se recuerda en el celular; no es un dato sensible).
+const DISTRITO_KEY = 'timeless_catalogo_distrito';
+let distritoTxt = '';
+try{ distritoTxt = localStorage.getItem(DISTRITO_KEY) || ''; }catch(e){ distritoTxt = ''; }
+let puntoRecojo = 0;          // índice en PUNTOS_RECOJO
+let fechaEntrega = '';        // "2026-10-25" (solo delivery)
+let pagoProducto = 'Yape';    // delivery: cómo paga el producto al recibir
+// Datos del cliente para el envío (nombre, DNI…). Solo viven mientras la página
+// está abierta: NO se guardan en el celular ni en ningún otro lado; viajan
+// únicamente dentro del mensaje que el cliente manda por chat.
+const datos = {};
+const CAMPOS_DATOS = {
+  moto: [['nombres', 'Nombres'], ['celular', 'Celular', 'tel'], ['direccion', 'Dirección'], ['maps', 'Dirección en Google Maps (link)', 'url']],
+  indrive: [['nombres', 'Nombres'], ['celular', 'Celular', 'tel'], ['direccion', 'Dirección'], ['maps', 'Dirección en Google Maps (link)', 'url']],
+  shalom: [['nombres', 'Nombres y apellidos completos'], ['celular', 'Celular', 'tel'], ['dni', 'DNI', 'text', 'numeric'],
+           ['departamento', 'Departamento'], ['provincia', 'Provincia'], ['distrito', 'Distrito'],
+           ['agencia', 'Agencia de Shalom'], ['correo', 'Correo (opcional)', 'email']],
+};
+
+/* ---------- Costo de envío por distrito ---------- */
+function buscarDistrito(txt){
+  const t = norm(txt);
+  if(!t) return null;
+  return (cfg.DISTRITOS || []).find(d => norm(d.n) === t || (d.alias || []).some(a => norm(a) === t)) || null;
+}
+// El delivery cuesta mínimo S/10 aunque la tarifa del courier sea menor.
+function rangoDistrito(d){
+  const piso = cfg.ENVIO_MINIMO_MOTO || 0;
+  const a = Math.max(piso, d.min), b = Math.max(piso, d.max || d.min);
+  return {min: a, max: b};
+}
+function textoRango(r){ return r.max > r.min ? fmtPrecio(r.min) + ' – ' + fmtPrecio(r.max) + ' según la zona' : fmtPrecio(r.min); }
+const cubreGratis = () => cfg.ENVIO_GRATIS_CUBRE || 0;
+const costoShalom = () => cfg.SHALOM_COSTO || 8;
+// Desde cuánto conviene recomendar Shalom en vez del delivery.
+const RECOMENDAR_SHALOM_DESDE = 15;
+
+// Recuadro con el costo aproximado del delivery a un distrito. Se usa en la
+// sección "Envíos y pagos" y en el carrito (ahí con el botón "Cambiar a Shalom").
+function cotizacionHTML(txt, gratis, enCarrito){
+  if(!norm(txt)) return '';
+  const d = buscarDistrito(txt);
+  if(!d) return '<div class="cotiz cotiz-no">No encontramos ese distrito. Escríbenos y revisamos si llegamos, o elige Shalom (' +
+    fmtPrecio(costoShalom()) + ' a todo el Perú).</div>';
+  const r = rangoDistrito(d);
+  let h = '<div class="cotiz"><div class="cotiz-fila"><span>Delivery a ' + esc(d.n) + '</span><b>' + textoRango(r) + '</b></div>';
+  if(d.nota) h += '<div class="cotiz-nota">' + esc(d.nota) + '</div>';
+  h += '<div class="cotiz-nota">' + (d.h48 ? 'Llega en 48 horas.' : 'Llega de un día para otro.') + ' Sujeto a cobertura: lo confirmamos por chat.</div>';
+  if(gratis) h += '<div class="cotiz-nota cotiz-ok">Tu envío gratis cubre hasta ' + fmtPrecio(cubreGratis()) +
+    (r.max > cubreGratis() ? '; si tu zona sale más, pagas solo la diferencia.' : '.') + '</div>';
+  if(r.max > RECOMENDAR_SHALOM_DESDE){
+    h += '<div class="recomendado"><b>Opción recomendada: Shalom, ' + fmtPrecio(costoShalom()) + '</b>' +
+      '<span>Sale más barato a tu distrito. Pagas el producto antes, el envío al recibir, y lo recoges cuando puedas en tu agencia.</span>' +
+      (enCarrito ? '<button type="button" class="btn-link" data-envio="shalom">Cambiar a Shalom</button>' : '') + '</div>';
+  }
+  return h + '</div>';
+}
+
+// Costo del envío elegido: {texto, costo}. costo = null cuando no hay un número
+// fijo (depende de la zona o se cotiza por chat).
+function envioEstimado(id, gratis){
+  const cubre = cubreGratis();
+  if(id === 'recojo') return {texto: 'Sin costo', costo: 0};
+  if(id === 'shalom') return gratis ? {texto: 'Gratis', costo: 0} : {texto: fmtPrecio(costoShalom()) + ' al recibir', costo: costoShalom()};
+  if(id === 'indrive') return {texto: gratis ? 'Gratis hasta ' + fmtPrecio(cubre) : 'Se cotiza por chat', costo: null};
+  if(id === 'moto'){
+    const d = buscarDistrito(distritoTxt);
+    if(!d) return {texto: 'desde ' + fmtPrecio(cfg.ENVIO_MINIMO_MOTO || 10), costo: null};
+    const r = rangoDistrito(d);
+    if(!gratis) return {texto: textoRango(r), costo: r.max === r.min ? r.min : null};
+    const a = Math.max(0, r.min - cubre), b = Math.max(0, r.max - cubre);
+    if(b === 0) return {texto: 'Gratis', costo: 0};
+    return a === b ? {texto: 'Pagas ' + fmtPrecio(a) + ' de diferencia', costo: a}
+                   : {texto: 'Gratis o hasta ' + fmtPrecio(b) + ' de diferencia', costo: null};
+  }
+  return {texto: '', costo: null};
+}
+
+/* ---------- Fecha de entrega del delivery (lun–sáb, máx. 1 semana) ---------- */
+function fechaISO(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function limitesFecha(){
+  const a = new Date(), b = new Date();
+  a.setDate(a.getDate() + 1);
+  b.setDate(b.getDate() + 7);
+  return {min: fechaISO(a), max: fechaISO(b)};
+}
+function avisoFecha(v){
+  if(!v) return '';
+  const l = limitesFecha();
+  if(v < l.min) return 'Elige desde mañana en adelante.';
+  if(v > l.max) return 'Solo se puede programar hasta 1 semana. Si lo necesitas para más adelante, coordínalo por chat.';
+  if(new Date(v + 'T12:00:00').getDay() === 0) return 'Los domingos no hay entregas: elige de lunes a sábado.';
+  return '';
+}
+function fechaBonita(v){
+  return new Date(v + 'T12:00:00').toLocaleDateString('es-PE', {weekday: 'long', day: 'numeric', month: 'long'});
+}
+
+// Botón "?" que muestra una explicación al pasar el cursor (PC) o al tocarlo (celular).
+function infoHTML(etiqueta, contenido){
+  return '<span class="info"><button type="button" class="info-btn" aria-label="' + esc(etiqueta) + '">?</button>' +
+    '<span class="info-pop" role="tooltip">' + contenido + '</span></span>';
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.info-btn');
+  document.querySelectorAll('.info.abierto').forEach(x => { if(!b || x !== b.parentNode) x.classList.remove('abierto'); });
+  if(b){ e.preventDefault(); e.stopPropagation(); b.parentNode.classList.toggle('abierto'); }
+});
 
 function guardarCarrito(){
   try{ localStorage.setItem(CARRITO_KEY, JSON.stringify(carrito)); }catch(e){}
@@ -550,15 +674,16 @@ function calcularPedido(ahora){
   const productos = centavos(subtotal - pr.total);
   const gratis = pedidoConEnvioGratis(lineas);
   const envio = (cfg.ENVIOS || []).find(x => x.id === envioSel) || null;
-  // Si el pedido tiene envío gratis, cuesta 0 sea cual sea el medio elegido.
-  const costoEnvio = envio ? (gratis ? 0 : envio.costo) : null;
+  const est = envio ? envioEstimado(envio.id, gratis) : null;
   return {lineas: lineas, subtotal: subtotal, promos: pr.items, descuento: pr.total,
-          productos: productos, gratis: gratis, envio: envio, costoEnvio: costoEnvio};
+          productos: productos, gratis: gratis, envio: envio, est: est,
+          costoEnvio: est ? est.costo : null};
 }
 
-// El pedido tal como le llega a Alberto por chat.
+// El pedido tal como le llega a Alberto por chat: productos, envío y datos.
 function textoPedido(){
   const ped = calcularPedido(Date.now());
+  const y = cfg.YAPE || {};
   let t = '¡Hola Timeless! Quiero hacer este pedido:\n\n' +
     ped.lineas.map(l => '• ' + l.cant + ' × ' + l.p.nombre + ' — ' + fmtPrecio(l.unit) +
       (l.cant > 1 ? ' c/u' : '') + (l.oferta ? ' (oferta)' : '')).join('\n');
@@ -567,10 +692,22 @@ function textoPedido(){
       (x.veces > 1 ? ' (×' + x.veces + ')' : '') + ': −' + fmtPrecio(x.monto)).join('\n');
   }
   t += '\n\nTotal productos: ' + fmtPrecio(ped.productos);
-  if(ped.gratis) t += '\nEnvío: gratis' + (ped.envio ? ' (' + ped.envio.nombre + ')' : '');
-  else if(ped.envio) t += '\nEnvío: ' + ped.envio.nombre + ' — ' + ped.envio.etiqueta;
-  else t += '\nEnvío: por coordinar';
-  if(!ped.gratis && ped.envio && ped.costoEnvio > 0) t += '\nTotal aprox.: ' + fmtPrecio(ped.productos + ped.costoEnvio);
+  const id = ped.envio ? ped.envio.id : '';
+  if(!ped.envio) t += '\nEnvío: por coordinar';
+  else {
+    let lugar = '';
+    if(id === 'recojo') lugar = ' en ' + ((cfg.PUNTOS_RECOJO || [])[puntoRecojo] || '');
+    if(id === 'moto'){ const d = buscarDistrito(distritoTxt); lugar = d ? ' a ' + d.n : (distritoTxt ? ' a ' + distritoTxt : ''); }
+    t += '\nEnvío: ' + ped.envio.nombre + lugar + ' (' + (ped.gratis && ped.est.texto !== 'Gratis' ? 'envío gratis · ' : '') + ped.est.texto + ')';
+    if(ped.costoEnvio > 0) t += '\nTotal aprox.: ' + fmtPrecio(ped.productos + ped.costoEnvio);
+    if(id === 'moto'){
+      if(fechaEntrega && !avisoFecha(fechaEntrega)) t += '\nDía de entrega: ' + fechaBonita(fechaEntrega);
+      t += '\nEl producto lo pago al recibir con: ' + pagoProducto;
+    }
+    if(id === 'shalom' || id === 'indrive') t += '\nYapeo ' + fmtPrecio(ped.productos) + ' (productos) al ' + (y.numero || '') + ' y te envío la captura.';
+    const campos = (CAMPOS_DATOS[id] || []).filter(c => String(datos[c[0]] || '').trim());
+    if(campos.length) t += '\n\nMis datos:\n' + campos.map(c => c[1].replace(/ \(.*\)$/, '') + ': ' + String(datos[c[0]]).trim()).join('\n');
+  }
   return t + '\n\nPedido armado desde el catálogo web.';
 }
 
@@ -614,7 +751,9 @@ function renderFicha(indice){
   const dato = (titulo, valor) => valor ? '<div class="dato"><dt>' + titulo + '</dt><dd>' + esc(valor) + '</dd></div>' : '';
   const enCarrito = carrito[p.id] || 0;
   const promos = e.disponible ? promosDe(p, ahora) : [];
-  const lineaTxt = e.linea ? ' · ' + e.linea : '';
+  const linea = lineaDe(e);
+  const esCinturon = norm(p.categoria) === 'cinturones';
+  const guia = (cfg.GUIA_TALLA || []).map(t => '<p>' + esc(t) + '</p>').join('');
   document.getElementById('fichaBody').innerHTML =
     '<div class="galeria"><div class="galeria-pista" id="galPista">' +
       medios.map((f, i) => esVideo(f)
@@ -626,8 +765,10 @@ function renderFicha(indice){
               '<div class="galeria-cuenta mono" id="galCuenta">1/' + medios.length + '</div>' : '') +
     '</div>' +
     '<div class="sheet-pad">' +
-      '<div class="eyebrow">' + esc(e.categoria) + esc(lineaTxt) + (e.nuevo && e.disponible ? ' · Nuevo' : '') + '</div>' +
+      '<div class="eyebrow">' + esc(e.categoria) + (e.nuevo && e.disponible ? ' · Nuevo' : '') + '</div>' +
       '<h2>' + esc(e.nombre) + '</h2>' +
+      etiquetasHTML(e) +
+      (linea && linea.descripcion ? '<p class="linea-desc"><b>' + esc(linea.titulo) + ':</b> ' + esc(linea.descripcion) + '</p>' : '') +
       (e.variantes.length > 1
         ? '<div class="variantes"><div class="variantes-titulo">Color</div><div class="chips">' +
           e.variantes.map(v => '<button type="button" class="chip' + (v.id === p.id ? ' activo' : '') + (v.disponible ? '' : ' agotado') +
@@ -641,10 +782,16 @@ function renderFicha(indice){
       (promos.length ? '<div class="promo-caja">' + promos.map(t => '<div>🏷 ' + esc(t) + '</div>').join('') + '</div>' : '') +
       '<dl class="datos">' +
         dato('Descripción y medidas', p.descripcion) +
-        // En cinturones la talla es la del pantalón (así está en el Canva); en el resto, "Tallas" a secas.
-        dato(norm(p.categoria) === 'cinturones' ? 'Tallas de pantalón' : 'Tallas', p.tallas) +
+        // En cinturones la talla es la del pantalón (así está en el Canva), con
+        // una "?" que explica cómo medirse; en el resto, "Tallas" a secas.
+        (esCinturon && p.tallas
+          ? '<div class="dato"><dt>Tallas de pantalón ' + infoHTML('¿Cómo saber tu talla?', '<b>¿Cómo saber tu talla?</b>' + guia) + '</dt><dd>' + esc(p.tallas) + '</dd></div>'
+          : dato('Tallas', p.tallas)) +
+        dato('Material', p.material) +
         dato('Nota', p.nota) +
+        dato('Cuidado', p.cuidado) +
       '</dl>' +
+      (esCinturon && guia ? '<div class="guia-talla"><div class="guia-titulo">¿Cómo saber tu talla?</div>' + guia + '</div>' : '') +
       (p.disponible
         ? '<button type="button" class="btn btn-primario" data-agregar="' + esc(p.id) + '">Agregar al carrito</button>'
         : avisoHTML(p)) +
@@ -697,6 +844,54 @@ document.getElementById('fichaBody').addEventListener('click', e => {
 let pasoCarrito = 'lista';
 let copiadoOk = false;
 
+// Lo que se abre debajo de la opción de envío elegida.
+function detalleEnvioHTML(id, ped){
+  const y = cfg.YAPE || {};
+  const yape = (monto, para) => '<div class="yape"><div class="yape-monto">Yapea ' + monto + '</div>' +
+    '<div>al <b class="mono">' + esc(y.numero || '') + '</b> · ' + esc(y.nombre || '') + '</div>' +
+    '<div class="nota-chica">' + para + ' Luego envía la captura en el chat junto con tu pedido.</div></div>';
+  const campos = (titulo, extra) => '<div class="datos-form"><div class="variantes-titulo">' + titulo + '</div>' +
+    (CAMPOS_DATOS[id] || []).map(c =>
+      '<label class="campo"><span>' + esc(c[1]) + (c[0] === 'maps' ? ' ' + infoHTML('Cómo mandar tu ubicación',
+        '<b>¿No tienes el link?</b> Mándanos por WhatsApp tu <b>ubicación actual</b> (no "en tiempo real"): se ve así 👇' +
+        '<img src="img/ubicacion-actual.jpg" alt="Ejemplo de ubicación actual en WhatsApp" loading="lazy">' +
+        'O en Google Maps busca tu casa → Compartir → Copiar enlace, y pégalo aquí.') : '') + '</span>' +
+      '<input type="' + (c[2] || 'text') + '"' + (c[3] ? ' inputmode="' + c[3] + '"' : '') + ' data-dato="' + c[0] + '" value="' + esc(datos[c[0]] || '') + '" autocomplete="off"></label>'
+    ).join('') + (extra || '') + '</div>';
+  let h = '';
+  if(id === 'recojo'){
+    h += '<div class="chips">' + (cfg.PUNTOS_RECOJO || []).map((pt, i) =>
+      '<label class="chip' + (i === puntoRecojo ? ' activo' : '') + '"><input type="radio" name="punto" value="' + i + '"' + (i === puntoRecojo ? ' checked' : '') + '>' + esc(pt) + '</label>').join('') + '</div>' +
+      '<p class="nota-chica">Coordinamos el día y la hora por chat. Pagas al recibir (o por adelantado, si prefieres).</p>';
+  }
+  if(id === 'moto'){
+    const l = limitesFecha();
+    const aviso = avisoFecha(fechaEntrega);
+    h += '<label class="campo"><span>Tu distrito</span><input id="distritoCarrito" list="listaDistritos" data-distrito value="' + esc(distritoTxt) + '" placeholder="Escribe o elige tu distrito" autocomplete="off"></label>' +
+      cotizacionHTML(distritoTxt, ped.gratis, true) +
+      '<label class="campo"><span>¿Qué día lo quieres? (lunes a sábado, 11am a 7pm)</span><input type="date" data-fecha min="' + l.min + '" max="' + l.max + '" value="' + esc(fechaEntrega) + '"></label>' +
+      (aviso ? '<div class="cotiz cotiz-no">' + esc(aviso) + '</div>' : '') +
+      '<div class="variantes-titulo" style="margin-top:12px">El producto lo pagas al recibir con</div><div class="chips">' +
+      ['Yape', 'Efectivo (monto exacto)'].map(v => '<label class="chip' + (v === pagoProducto ? ' activo' : '') + '"><input type="radio" name="pagoprod" value="' + esc(v) + '"' + (v === pagoProducto ? ' checked' : '') + '>' + esc(v) + '</label>').join('') + '</div>';
+    if(ped.costoEnvio > 0) h += yape(fmtPrecio(ped.costoEnvio) + ' del envío', 'Así tu pedido queda separado (máximo 1 semana).');
+    else if(ped.costoEnvio === 0) h += '<p class="nota-chica">Tu envío es gratis: te escribimos para confirmar y separar tu pedido.</p>';
+    else if(ped.gratis) h += '<p class="nota-chica">Tu envío gratis cubre hasta ' + fmtPrecio(cubreGratis()) + '. Te confirmamos por chat si tu zona tiene alguna diferencia.</p>';
+    else h += '<p class="nota-chica">Te confirmamos el costo exacto por chat y ahí yapeas solo el envío para separar tu pedido (máximo 1 semana).</p>';
+    h += campos('Tus datos para el delivery');
+  }
+  if(id === 'indrive'){
+    h += yape(fmtPrecio(ped.productos), 'Es el pago de tus productos; el envío lo pagas al recibir (te lo cotizamos por chat).') +
+      '<p class="nota-chica">Coordinamos el día y la hora por chat. Te mandamos foto al dejarlo con el conductor y el seguimiento en vivo.</p>' +
+      campos('Tus datos para el envío');
+  }
+  if(id === 'shalom'){
+    h += yape(fmtPrecio(ped.productos), 'Es el pago de tus productos; el envío (' + (ped.gratis ? 'gratis' : fmtPrecio(costoShalom())) + ') lo pagas al recibir.') +
+      '<p class="nota-chica">S/12 solo en algunas zonas de la selva. El día en que lo dejamos en Shalom se coordina por chat; te enviamos la guía y la clave al registrarlo y la boleta al dejarlo. ¿Lo quieres más rápido? Pregúntanos por el envío express por avión.</p>' +
+      campos('Datos para Shalom', '<p class="nota-chica">Los datos deben ser de una persona mayor de edad.</p>');
+  }
+  return h ? '<div class="envio-detalle">' + h + '</div>' : '';
+}
+
 function renderCarrito(){
   const ahora = Date.now();
   const body = document.getElementById('carritoBody');
@@ -710,7 +905,7 @@ function renderCarrito(){
     body.innerHTML = '<div class="sheet-pad">' +
       '<h2>Cerrar pedido</h2>' +
       '<p class="pregunta">¿Coordinamos por WhatsApp o por Instagram?</p>' +
-      '<p class="nota-chica">Te respondemos por el chat que elijas para confirmar stock, envío y forma de pago. Aquí no se paga nada.</p>' +
+      '<p class="nota-chica">Te respondemos por el chat que elijas para confirmar stock y tu envío. Si justo algo se agotó, te avisamos ahí.</p>' +
       '<button type="button" class="btn btn-wa" data-canal="whatsapp">WhatsApp</button>' +
       '<button type="button" class="btn" data-canal="instagram">Instagram</button>' +
       '<button type="button" class="btn-link" data-paso="lista">← Volver al carrito</button>' +
@@ -770,20 +965,22 @@ function renderCarrito(){
         '</span><span>−' + fmtPrecio(x.monto) + '</span></div>').join('')
     : '';
 
-  // Cómo lo recibe: opcional, y sin número fijo si el pedido ya tiene envío gratis.
+  // Cómo lo recibe: opcional. Al elegir una opción se abre su detalle (distrito,
+  // fecha, datos, a cuánto yapear).
   const envios = cfg.ENVIOS || [];
-  const opcionHTML = (id, nombre, precio, nota, sel) =>
+  const opcionHTML = (id, nombre, precio, pago, sel) =>
     '<label class="opcion' + (sel ? ' sel' : '') + '"><input type="radio" name="envio" value="' + esc(id) + '"' + (sel ? ' checked' : '') + '>' +
     '<span class="opcion-cuerpo"><span class="opcion-fila"><span class="opcion-nombre">' + esc(nombre) + '</span>' +
     (precio ? '<span class="opcion-precio">' + esc(precio) + '</span>' : '') + '</span>' +
-    (sel && nota ? '<span class="opcion-nota">' + esc(nota) + '</span>' : '') + '</span></label>';
+    (pago ? '<span class="opcion-nota">' + esc(pago) + '</span>' : '') + '</span></label>' +
+    (sel ? detalleEnvioHTML(id, ped) : '');
   const enviosHTML = envios.length && validas.length
-    ? '<div class="envio-bloque"><div class="variantes-titulo">¿Cómo lo recibes? (opcional)</div>' +
-      envios.map(x => opcionHTML(x.id, x.nombre, ped.gratis ? 'Gratis' : x.etiqueta, x.nota, envioSel === x.id)).join('') +
-      opcionHTML('', 'Lo coordino por chat', '', 'Te confirmamos el costo exacto según tu distrito.', !envioSel) +
+    ? '<div class="envio-bloque"><div class="variantes-titulo">¿Cómo lo recibes? Cotiza tu envío</div>' +
+      envios.map(x => opcionHTML(x.id, x.nombre, envioEstimado(x.id, ped.gratis).texto, x.pago, envioSel === x.id)).join('') +
+      opcionHTML('', 'Lo coordino por chat', '', 'Te ayudamos a elegir la mejor opción.', !envioSel) +
       '</div>'
     : '';
-  const totalAprox = (!ped.gratis && ped.envio && ped.costoEnvio > 0)
+  const totalAprox = (ped.envio && ped.costoEnvio > 0)
     ? '<div class="fila-total"><span>Envío aprox.</span><span>' + fmtPrecio(ped.costoEnvio) + '</span></div>' +
       '<div class="total"><span>Total aprox.</span><b>' + fmtPrecio(ped.productos + ped.costoEnvio) + '</b></div>'
     : '<div class="total"><span>Total productos</span><b>' + fmtPrecio(ped.productos) + '</b></div>';
@@ -791,9 +988,9 @@ function renderCarrito(){
   body.innerHTML = '<div class="sheet-pad"><h2>Tu pedido</h2>' + filas + promosHTML + enviosHTML +
     '<div class="resumen-total">' + totalAprox + '</div>' +
     (ped.gratis
-      ? '<div class="envio-gratis envio-gratis-caja">🚚 Tu pedido va con envío gratis</div>'
+      ? '<div class="envio-gratis envio-gratis-caja">🚚 Tu pedido va con envío gratis (cubre hasta ' + fmtPrecio(cubreGratis()) + ')</div>'
       : '') +
-    '<p class="nota-chica">El costo de envío es aproximado y se confirma por chat. Pagas contraentrega, con Yape o transferencia.</p>' +
+    '<p class="nota-chica">El costo de envío es aproximado y se confirma por chat. Solo enviamos dentro del Perú. En cualquier opción también puedes pagar todo por adelantado.</p>' +
     (validas.length
       ? '<button type="button" class="btn btn-primario" data-paso="canal">Cerrar pedido</button>'
       : '<button type="button" class="btn" disabled>No hay productos disponibles en tu carrito</button>') +
@@ -835,15 +1032,43 @@ function copiar(texto){
   return Promise.resolve(viejo());
 }
 
+function guardarDistrito(){
+  try{ localStorage.setItem(DISTRITO_KEY, distritoTxt); }catch(e){}
+}
+// Repinta el carrito sin perder dónde estaba el cliente (scroll y, si estaba
+// escribiendo su distrito, el cursor).
+function repintarCarrito(enfocar){
+  const sheet = document.querySelector('#carritoOverlay .sheet');
+  const top = sheet ? sheet.scrollTop : 0;
+  renderCarrito();
+  if(sheet) sheet.scrollTop = top;
+  if(enfocar){
+    const el = document.getElementById(enfocar);
+    if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(err){} }
+  }
+}
 document.getElementById('carritoBody').addEventListener('change', e => {
-  if(e.target.name === 'envio'){
-    envioSel = e.target.value;
-    guardarEnvio();
-    renderCarrito();
+  const t = e.target;
+  if(t.name === 'envio'){ envioSel = t.value; guardarEnvio(); repintarCarrito(); }
+  else if(t.name === 'punto'){ puntoRecojo = Number(t.value) || 0; repintarCarrito(); }
+  else if(t.name === 'pagoprod'){ pagoProducto = t.value; repintarCarrito(); }
+  else if(t.hasAttribute('data-fecha')){ fechaEntrega = t.value; repintarCarrito(); }
+  else if(t.hasAttribute('data-distrito')){ distritoTxt = t.value; guardarDistrito(); repintarCarrito(); }
+});
+document.getElementById('carritoBody').addEventListener('input', e => {
+  const t = e.target;
+  if(t.dataset.dato){ datos[t.dataset.dato] = t.value; return; }
+  if(t.hasAttribute('data-distrito')){
+    distritoTxt = t.value;
+    guardarDistrito();
+    // Apenas lo escrito coincide con un distrito, se muestra el costo.
+    if(buscarDistrito(distritoTxt)) repintarCarrito('distritoCarrito');
   }
 });
 document.getElementById('carritoBody').addEventListener('click', e => {
   const t = e.target;
+  const cambio = t.closest('[data-envio]');
+  if(cambio){ envioSel = cambio.dataset.envio; guardarEnvio(); repintarCarrito(); return; }
   const cant = t.closest('[data-cant]');
   if(cant){ setCantidad(cant.dataset.id, (carrito[cant.dataset.id] || 0) + Number(cant.dataset.cant)); renderCarrito(); return; }
   const quitar = t.closest('[data-quitar]');
@@ -937,6 +1162,7 @@ function calcFirma(ahora){
          PROMOS.map(pr => promoActiva(pr, ahora) ? '1' : '0').join('');
 }
 setInterval(() => {
+  renderFranja();
   const ahora = Date.now();
   const firma = calcFirma(ahora);
   if(firma !== firmaOfertas){
@@ -963,7 +1189,6 @@ function toast(msg){
 // la página no se publique por descuido con datos de mentira o sin WhatsApp.
 function renderAvisoConfig(){
   const faltan = [];
-  if(!/^https?:\/\//.test(cfg.CSV_PRODUCTOS || '')) faltan.push('Los productos salen de una <b>copia de tu Canva</b> guardada en la página (todavía no se lee la hoja de Google) y <b>faltan fotos de algunos productos</b>.');
   if(!String(cfg.WHATSAPP_NUMERO || '').replace(/\D/g, '')) faltan.push('Falta el <b>número de WhatsApp</b>: el pedido se abre sin destinatario.');
   if(!cfg.TIKTOK_USUARIO) faltan.push('Falta el <b>usuario de TikTok</b>: el botón no aparece hasta ponerlo.');
   if(!cfg.INSTAGRAM_USUARIO) faltan.push('Falta el <b>usuario de Instagram</b>.');
@@ -973,7 +1198,53 @@ function renderAvisoConfig(){
     'Este aviso desaparece solo cuando todo esté configurado en <b>config.js</b>.';
 }
 
+// Franja animada de campañas (Cyber Wow, Black Friday…), configurada en config.js.
+function renderFranja(){
+  const f = cfg.FRANJA || {};
+  const el = document.getElementById('franja');
+  if(!el) return;
+  const prueba = /[?&]franja=prueba\b/.test(location.search);
+  const ahora = Date.now(), d = parseFechaLima(f.desde), h = parseFechaLima(f.hasta);
+  const vigente = f.activa && f.texto &&
+    (d === null || (!isNaN(d) && ahora >= d)) && (h === null || (!isNaN(h) && ahora < h));
+  if(!(vigente || (prueba && f.texto))){ el.hidden = true; el.innerHTML = ''; return; }
+  if(el.hidden){
+    // Dos mitades iguales: al llegar al final de una, empieza la otra sin salto.
+    const mitad = ('<span>' + esc(f.texto) + '</span><span class="franja-sep" aria-hidden="true">✦</span>').repeat(6);
+    el.innerHTML = '<div class="franja-pista"><div class="franja-mitad">' + mitad + '</div><div class="franja-mitad" aria-hidden="true">' + mitad + '</div></div>';
+    el.setAttribute('aria-label', f.texto);
+    el.hidden = false;
+  }
+}
+
+// Sección "Envíos y pagos" de la página: sale de config.js (lo mismo que el carrito).
+function renderEnviosSeccion(){
+  const cont = document.getElementById('enviosCards');
+  if(!cont) return;
+  cont.innerHTML = (cfg.ENVIOS || []).map(x =>
+    '<div class="envio-card"><div class="envio-titulo">' + esc(x.nombre) + '</div>' +
+    '<div class="envio-pago">' + esc(x.pago) + '</div><p>' + esc(x.texto) + '</p>' +
+    (x.id === 'moto'
+      ? '<label class="campo"><span>Cotiza tu envío</span><input id="distritoHome" list="listaDistritos" placeholder="Escribe o elige tu distrito" autocomplete="off" value="' + esc(distritoTxt) + '"></label>' +
+        '<div id="cotizHome">' + cotizacionHTML(distritoTxt, false, false) + '</div>'
+      : '') +
+    '</div>').join('');
+  const lista = document.getElementById('listaDistritos');
+  if(lista) lista.innerHTML = (cfg.DISTRITOS || []).map(d => '<option value="' + esc(d.n) + '">').join('');
+  const inp = document.getElementById('distritoHome');
+  if(inp){
+    const act = () => {
+      distritoTxt = inp.value;
+      guardarDistrito();
+      document.getElementById('cotizHome').innerHTML = cotizacionHTML(distritoTxt, false, false);
+    };
+    inp.addEventListener('change', act);
+    inp.addEventListener('input', () => { if(buscarDistrito(inp.value) || !inp.value) act(); });
+  }
+}
+
 function renderTodo(){
+  renderFranja();
   renderGrilla();
   renderContador();
   ruta();
@@ -988,5 +1259,7 @@ if(cfg.TIKTOK_USUARIO){
   tk.hidden = false;
 }
 renderAvisoConfig();
+renderFranja();
+renderEnviosSeccion();
 renderContador();
 cargar();

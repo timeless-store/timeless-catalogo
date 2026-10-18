@@ -33,26 +33,75 @@ const CATALOGO_CONFIG = {
   // y apagan en promos.csv. Si el archivo no carga, la página funciona sin promos.
   CSV_PROMOS: 'promos.csv',
 
-  // Cómo recibe el cliente su pedido. El costo es APROXIMADO: Alberto lo confirma
-  // por chat según el distrito. Si el pedido ya tiene envío gratis, todos cuestan 0.
-  // "costo" es el número que se suma al total aproximado; "etiqueta", lo que se lee.
-  ENVIOS: [
-    {id: 'recojo', nombre: 'Recojo en Plaza San Miguel', costo: 0, etiqueta: 'Gratis',
-     nota: 'Pagas al recibir (contraentrega). Coordinamos día y hora por chat.'},
-    {id: 'moto', nombre: 'Motorizado en Lima', costo: 10, etiqueta: 'desde S/10',
-     nota: 'Pagas al recibir (contraentrega). Llega de un día para otro, de 11am a 7pm. El costo exacto depende del distrito.'},
-    {id: 'shalom', nombre: 'Shalom — Lima y provincias', costo: 8, etiqueta: 'aprox. S/8',
-     nota: 'Pagas el producto antes de enviar (Yape o transferencia) y el envío al recibir. Llega de 1 a 3 días.'},
+  // Yape para los pagos por adelantado (Shalom, InDrive, o el envío del delivery).
+  YAPE: {numero: '960612770', nombre: 'José Herrera'},
+
+  // Franja animada arriba de todo (Black Friday, Cyber Wow…). Solo aparece entre
+  // "desde" y "hasta" (hora de Lima). Para apagarla: activa: false.
+  // Para verla de prueba sin prenderla: abrir la página con ?franja=prueba al final.
+  FRANJA: {
+    activa: false,
+    texto: 'CYBER WOW · Descuentos de hasta 20% · Del 4 al 6 de noviembre',
+    desde: '2026-11-04 00:00',
+    hasta: '2026-11-06 23:59',
+  },
+
+  // ---------- ENVÍOS ----------
+  // Solo enviamos dentro del Perú. Los costos son APROXIMADOS: se confirman por chat.
+  // El envío gratis (cinturones premium o promos) cubre hasta este monto en
+  // delivery, InDrive o Shalom; si el envío cuesta más, el cliente paga la diferencia.
+  ENVIO_GRATIS_CUBRE: 16,
+  ENVIO_MINIMO_MOTO: 10,
+  SHALOM_COSTO: 8,
+
+  // Puntos de recojo sin costo (pago contraentrega).
+  PUNTOS_RECOJO: ['Plaza San Miguel', 'Av. La Paz cdras. 6–8, San Miguel'],
+
+  // Delivery con motorizado: costo por distrito. "min"/"max" cuando depende de la
+  // zona; "h48" = llega en 48 horas; "nota" se muestra al cliente.
+  // Lo que pasa de S/15 muestra a Shalom como opción recomendada.
+  DISTRITOS: [
+    {n: 'San Isidro', min: 10}, {n: 'Lince', min: 10}, {n: 'Jesús María', min: 10},
+    {n: 'Pueblo Libre', min: 10}, {n: 'Breña', min: 10},
+    {n: 'San Miguel', min: 10}, {n: 'Magdalena del Mar', min: 10, alias: ['magdalena']},
+    {n: 'Cercado de Lima', min: 10, alias: ['lima', 'cercado', 'lima cercado']},
+    {n: 'Surquillo', min: 10}, {n: 'Santiago de Surco', min: 10, alias: ['surco']},
+    {n: 'Miraflores', min: 10}, {n: 'San Luis', min: 10}, {n: 'La Victoria', min: 10}, {n: 'San Borja', min: 10},
+    {n: 'San Martín de Porres', min: 10, max: 15, nota: 'Oquendo (zona alejada): S/15', alias: ['smp']},
+    {n: 'Comas', min: 10}, {n: 'Los Olivos', min: 10}, {n: 'Independencia', min: 10},
+    {n: 'Chorrillos', min: 10}, {n: 'Barranco', min: 10},
+    {n: 'Villa María del Triunfo', min: 13, max: 16, nota: 'José Gálvez: S/16', alias: ['vmt']},
+    {n: 'San Juan de Miraflores', min: 13, alias: ['sjm']}, {n: 'Villa El Salvador', min: 13, alias: ['ves']},
+    {n: 'San Juan de Lurigancho', min: 13, alias: ['sjl']}, {n: 'El Agustino', min: 10}, {n: 'Rímac', min: 10},
+    {n: 'La Molina', min: 10, max: 18, nota: 'Hasta Sol de La Molina: S/10 · Musa: S/18'},
+    {n: 'Ate', min: 10, max: 18, nota: 'Huaycán: S/18 · Santa Clara: S/16', alias: ['ate vitarte', 'vitarte']},
+    {n: 'Santa Anita', min: 10},
+    {n: 'Callao', min: 10, max: 16, nota: 'Hasta Óvalo 200 Millas: S/10 · Oquendo: S/15 · Márquez: S/16'},
+    {n: 'Bellavista', min: 10}, {n: 'Carmen de la Legua', min: 10}, {n: 'La Perla', min: 10}, {n: 'La Punta', min: 15},
+    {n: 'Puente Piedra', min: 15}, {n: 'Carabayllo', min: 15},
+    {n: 'Ventanilla', min: 18, h48: true}, {n: 'Chaclacayo', min: 18},
+    {n: 'Lurigancho (Chosica)', min: 18, h48: true, alias: ['chosica', 'lurigancho']},
+    {n: 'Lurín', min: 18, h48: true}, {n: 'Ancón', min: 18, h48: true}, {n: 'Cieneguilla', min: 20, h48: true},
   ],
 
-  // Líneas dentro de una categoría (columna "Linea" de la hoja). Si ningún
-  // producto de la categoría tiene línea, no se muestran los subtítulos.
-  // TODO(Alberto): revisar el texto de la línea premium; lo armé con lo que me
-  // dijiste (eco cuero, dije más llamativo, aleación de alta calidad).
+  // Formas de recibir el pedido (el orden es el del carrito y el de la sección
+  // "Envíos y pagos"). "id" no se cambia: lo usa el código.
+  ENVIOS: [
+    {id: 'recojo', nombre: 'Recojo sin costo', pago: 'Pago contraentrega',
+     texto: 'En Plaza San Miguel o en Av. La Paz cdras. 6–8, San Miguel (zonas seguras). Coordinamos el día y la hora por chat.'},
+    {id: 'moto', nombre: 'Delivery con motorizado', pago: 'Pago contraentrega · adelantas solo el envío',
+     texto: 'A casi todo Lima Metropolitana, de lunes a sábado de 11am a 7pm. Elige tu distrito y te mostramos el costo aproximado (mínimo S/10). Adelantando el envío por Yape, tu pedido queda separado; el producto lo pagas al recibir.'},
+    {id: 'indrive', nombre: 'Envío express por InDrive', pago: 'Pagas el producto antes · el envío al recibir',
+     texto: 'Enviamos desde San Miguel; recomendado para distritos cercanos (a veces sale más barato que el motorizado). El costo y la hora se coordinan por chat. Te mandamos foto y el seguimiento en vivo.'},
+    {id: 'shalom', nombre: 'Shalom — todo el Perú', pago: 'Pagas el producto antes · el envío al recibir',
+     texto: 'Envío S/8 que pagas al recibir (S/12 solo en algunas zonas de la selva). En Lima llega al día siguiente de dejarlo y lo recoges cuando puedas, en el horario de tu agencia. Te mandamos la guía y la clave al registrarlo.'},
+  ],
+
+  // Líneas dentro de una categoría (columna "Linea" de la hoja). Se muestran como
+  // etiqueta en la tarjeta (con esta descripción al pasar el cursor) y en la ficha.
   LINEAS: [
-    {clave: 'Premium', titulo: 'Línea premium',
-     descripcion: 'Hechos de eco cuero, con un dije más llamativo y aleación de alta calidad.'},
-    {clave: 'Clásica', titulo: 'Línea clásica', descripcion: ''},
+    {clave: 'Premium', titulo: 'Línea Premium',
+     descripcion: 'Hechos de eco cuero, con un dije más llamativo y aleación con recubrimiento de alta calidad.'},
   ],
 
   // Orden en que aparecen las categorías. Si en la hoja aparece una categoría
@@ -61,4 +110,10 @@ const CATALOGO_CONFIG = {
 
   // Frase con la que cierra cada categoría y cada ficha (la misma del Canva).
   FRASE_TALLA: '¿No sabes si te queda? Escríbenos por DM y te ayudamos a elegir tu talla',
+
+  // "¿Cómo saber tu talla?" de los cinturones (el texto del Canva).
+  GUIA_TALLA: [
+    'Mide tu cintura en cm (con una cinta, o usa el número de tu pantalón favorito) y compara con el rango en cm de cada cinto. La talla de pantalón es solo referencial 👌',
+    'A todos los cintos se les puede hacer huecos extra para cinturas más pequeñas o grandes, preguntando al DM.',
+  ],
 };

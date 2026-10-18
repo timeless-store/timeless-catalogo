@@ -6,7 +6,7 @@
 <!-- TODO: quitar esta línea el día que el catálogo se anuncie al público. Mientras está en pruebas, le pide a Google que no lo muestre en las búsquedas. -->
 <meta name="robots" content="noindex, nofollow">
 <title>Timeless Store — Catálogo</title>
-<meta name="description" content="Accesorios de streetwear en Lima: cinturones, collares, pant chains, anillos y lentes. Arma tu pedido y coordinamos por WhatsApp o Instagram.">
+<meta name="description" content="Accesorios de streetwear en Lima: cinturones, collares, pant chains y más. Arma tu pedido, cotiza tu envío y lo coordinamos por WhatsApp o Instagram.">
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -17,12 +17,27 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Timeless">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="favicon.png">
+
+<!-- Vista previa al compartir el link (WhatsApp, Instagram, Facebook). La imagen
+     va con dirección completa porque esas apps no entienden direcciones cortas. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Timeless Store">
+<meta property="og:title" content="Timeless Store — Catálogo">
+<meta property="og:description" content="Cinturones, collares, pant chains y más. Arma tu pedido, cotiza tu envío y lo coordinamos por WhatsApp o Instagram.">
+<meta property="og:url" content="https://timeless-store.github.io/timeless-catalogo/">
+<meta property="og:image" content="https://timeless-store.github.io/timeless-catalogo/og-imagen.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header class="top">
+  <!-- Franja de campañas (Cyber Wow, Black Friday…): se prende en config.js -->
+  <div class="franja" id="franja" role="marquee" hidden></div>
   <div class="top-in">
     <a class="marca" href="#" id="marcaLink">
       <div class="eyebrow">Accesorios streetwear · Lima</div>
@@ -47,15 +62,18 @@
   <!-- Inicio: lo primero que ve el cliente. -->
   <section class="hero">
     <div class="hero-eyebrow">Catálogo 2026</div>
-    <h1>Cinturones, collares y más para tu outfit</h1>
-    <p>Elige lo que te guste, arma tu pedido y lo coordinamos por WhatsApp o Instagram.</p>
+    <!-- Cuando haya anillos disponibles: "Cinturones, collares, pant chains, anillos y más" -->
+    <h1>Cinturones, collares, pant chains y más</h1>
+    <p>Elige lo que te guste, arma tu pedido, cotiza tu envío y lo coordinamos por WhatsApp o Instagram.</p>
     <div class="hero-cta">
       <a class="btn btn-primario" href="#catalogo" data-scroll="catalogo">Ver catálogo</a>
       <a class="btn" id="heroWa" href="#" target="_blank" rel="noopener">Escríbenos</a>
     </div>
+    <!-- Los tres primeros bajan a "Envíos y pagos". -->
     <ul class="hero-chips">
-      <li>Contraentrega en Lima</li>
-      <li>Envíos a provincias por Shalom</li>
+      <li><a href="#envios" data-scroll="envios">Puntos de recojo sin costo</a></li>
+      <li><a href="#envios" data-scroll="envios">Contraentrega en Lima</a></li>
+      <li><a href="#envios" data-scroll="envios">Envíos a todo el Perú por Shalom</a></li>
       <li>Te ayudamos a elegir tu talla</li>
     </ul>
   </section>
@@ -64,29 +82,20 @@
     <div class="estado" id="estado">Cargando catálogo…</div>
   </main>
 
-  <!-- Envíos y pagos: lo mismo que la historia destacada de Instagram. Los números
-       de cuenta NO van aquí a propósito: se dan por chat, después de confirmar stock. -->
+  <!-- Envíos y pagos: las tarjetas salen de ENVIOS en config.js (lo mismo que el carrito).
+       El Yape se muestra recién en el carrito, al elegir cómo recibir el pedido. -->
   <section class="cat" id="envios">
     <h2 class="cat-titulo">Envíos y pagos</h2>
-    <div class="envios">
-      <div class="envio-card">
-        <div class="envio-titulo">Recojo sin costo</div>
-        <div class="envio-pago">Pago contraentrega</div>
-        <p>En Plaza San Miguel. Coordinamos día y hora por chat.</p>
-      </div>
-      <div class="envio-card">
-        <div class="envio-titulo">Delivery con motorizado</div>
-        <div class="envio-pago">Pago contraentrega</div>
-        <p>A casi todo Lima Metropolitana, de un día para otro, entre 11am y 7pm. El costo se coordina por chat según tu distrito.</p>
-      </div>
-      <div class="envio-card">
-        <div class="envio-titulo">Shalom · Lima y provincias</div>
-        <div class="envio-pago">Pagas el producto antes de enviar</div>
-        <p>El envío cuesta entre S/8 y S/12 y lo pagas al recibir. Llega de 1 a 3 días después de dejar el pedido.</p>
-      </div>
-    </div>
-    <p class="frase-talla">Aceptamos Yape, Plin y transferencia. Efectivo solo en contraentrega.</p>
+    <div class="envios" id="enviosCards"></div>
+    <ul class="envios-notas">
+      <li>Solo hacemos envíos dentro del Perú.</li>
+      <li>En cualquier opción también puedes pagar todo por adelantado.</li>
+      <li>Tu pedido queda separado al pagar el envío (delivery) o el producto (Shalom e InDrive), hasta por 1 semana. Para más tiempo, coordínalo por chat.</li>
+      <li>Envío gratis (cinturones de la Línea Premium y promos): cubre hasta S/16 en delivery, InDrive o Shalom. Si tu envío cuesta más, pagas solo la diferencia.</li>
+    </ul>
+    <p class="frase-talla">Aceptamos Yape, Plin y transferencia. Efectivo solo en contraentrega (monto exacto).</p>
   </section>
+  <datalist id="listaDistritos"></datalist>
 
   <footer class="pie">
     <div class="pie-links">

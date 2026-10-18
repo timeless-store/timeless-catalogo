@@ -86,3 +86,15 @@
 - **Disponible según el stock de ese día**: pasaron a disponibles Black Spider (llegó), Cinturón Chrome Hearts, Collar Gothic Cross y Collar de Púas Punk; pasaron a agotados White Cross Deluxe, Pant Chain Spiderboy y Anillos Duki.
 - Del Excel solo se leyeron nombre, precio de venta y stock. Nada de costos.
 - Decisiones de Alberto (18 oct): Bullcore y White Chrome Hearts descontinuados para siempre (fuera del catálogo). Lentes Chrome Hearts fuera hasta que él lo pida. **Recordarle al terminar de pulir**: revisar qué productos se muestran (por ejemplo, el Collar Murciélago v2 no lo quiere visible, pero se guarda por si vuelve).
+
+## 8. Envíos, materiales y orden (18 de octubre, tarde)
+
+- **Columna `Visible`** en `productos.csv`: con `NO` el producto no sale en la página (hoy: Black Cross Deluxe, hasta que Alberto lo anuncie con teasers). El Collar Murciélago v2 salió del archivo.
+- **Columnas `Material`, `Coleccion` y `Cuidado`**: etiquetas "Acero inoxidable" / "Acero 316L" / "Drop Duki" y nota de cuidado en los de aleación.
+- **Cinturones juntos** (sin separar Premium/Clásica): disponibles primero, en el orden del archivo. La Línea Premium sale como etiqueta, con su explicación al pasar el cursor y dentro de la ficha.
+- **Variantes**: Black & White Spider e Iced Y2K (Silver/Black) son una sola ficha con selector de color.
+- **Más vendidos**: la columna `BestSeller` lleva el puesto (1, 2, 3…).
+- **Envíos**: 4 opciones (recojo, delivery con cotizador por distrito, InDrive, Shalom) que salen de `config.js`; el carrito pide los datos de cada una y muestra el Yape cuando toca adelantar algo. Los datos del cliente no se guardan: solo viajan en el mensaje.
+- **Franja de campañas** (Cyber Wow, Black Friday): `FRANJA` en `config.js`. Vista de prueba: agregar `?franja=prueba` al link.
+- **Logo**: ícono de pestaña, ícono de la app y vista previa al compartir, sacados de una copia de "Bolsas de plástico 2026" (el original no se tocó). Copias del logo en la carpeta Branding.
+- **Fotos**: lo suelto en la carpeta de un producto va a la web; las subcarpetas (otras versiones) no. Excepción temporal: Cemetery Cross usa de portada la foto 2 de "Versión 2".
