@@ -98,7 +98,7 @@ const CATALOGO_CONFIG = {
   // Olva Courier no va como opción (Alberto prefiere Shalom): solo una nota en Shalom.
   ENVIOS: [
     {id: 'recojo', nombre: 'Recojo sin costo', pago: 'Pago contraentrega',
-     texto: 'En Plaza San Miguel o en Av. La Paz cdras. 6–8, San Miguel (el punto exacto te lo damos por chat). Coordinamos el día y la hora por chat.',
+     texto: 'En Plaza San Miguel o en Av. La Paz cdras. 6–8, San Miguel (el punto exacto te lo damos por chat). Coordinamos el día y la hora por chat; si pagas en efectivo, el vuelto se coordina.',
      mapa: {texto: '📍 Ver Plaza San Miguel en el mapa', url: 'https://www.google.com/maps/search/?api=1&query=Plaza%20San%20Miguel%2C%20Lima'}},
     {id: 'moto', nombre: 'Delivery con motorizado', pago: 'Pago contraentrega · adelantas solo el envío',
      texto: 'A casi todo Lima Metropolitana, de lunes a sábado de 11am a 7pm (no hacemos envíos domingos ni feriados). Elige tu distrito y te mostramos el costo aproximado. Adelantando el envío por Yape, tu pedido queda separado; el producto lo pagas al recibir.'},

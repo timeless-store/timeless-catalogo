@@ -1185,23 +1185,27 @@ details.datos-form .opc{font-weight:500;color:var(--muted);}
 .hero h1,.hero-eyebrow{color:#fff;}
 .hero p{color:rgba(255,255,255,.78);}
 .hero-chips li{background:rgba(0,0,0,.35);}
-@media (min-width:760px){
-  .hero{
-    padding:34px 28px 28px 46%;
-    min-height:430px;
-    background:linear-gradient(90deg, #24174a 0%, #1a1238 40%, #110c22 65%, #0b0a12 100%);
-  }
-  .hero-foto{
-    right:auto;bottom:0;
-    width:52%;height:100%;
-    object-position:center center;
-    -webkit-mask-image:linear-gradient(90deg, #000 55%, transparent 100%);
-    mask-image:linear-gradient(90deg, #000 55%, transparent 100%);
-  }
-}
 
 .mapa-link{display:inline-block;margin-top:8px;font-size:13px;font-weight:700;color:var(--accent-txt);}
 .combo-agotado-txt{text-align:center;margin-top:16px;}
 
 /* Atajo de la sección en la que estás */
 .cats a.activo{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+/* Inicio en PC: la foto completa a la izquierda (corrida un poco hacia afuera, así
+   se ve más de los productos de la derecha) y el degradado empieza donde ella termina. */
+@media (min-width:760px){
+  .hero{
+    padding:34px 28px 28px 50%;
+    min-height:440px;
+    background:linear-gradient(90deg, #1e1440 0%, #1e1440 48%, #110c22 70%, #0b0a12 100%);
+  }
+  .hero-foto{
+    right:auto;bottom:0;
+    left:-9%;
+    width:57%;height:100%;
+    object-position:right center;
+    -webkit-mask-image:linear-gradient(90deg, #000 94%, transparent 100%);
+    mask-image:linear-gradient(90deg, #000 94%, transparent 100%);
+  }
+}

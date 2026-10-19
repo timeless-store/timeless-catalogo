@@ -158,3 +158,5 @@
 - Combo Spider + Pant Chain Spiderboy (agotado: lleva a los otros combos). Link a Plaza San Miguel en el mapa. 316L: "El acero inoxidable más resistente".
 - El menú de atajos marca solo la sección en la que estás.
 - (19-oct, más tarde) El **orden automático queda APAGADO**: Alberto ordena a mano y avisa cuándo usar el del dashboard. Foto del inicio cambiada por una foto general de varios productos (para que no pregunten por uno en particular). "Agotado" sobre la foto del combo agotado. Carrusel de clientes: avanza de la 1 a la 13 y vuelve a empezar, con fotos de tamaño fijo.
+- (19-oct) Inicio en PC: la foto completa a la izquierda y el degradado empieza donde ella termina. Carrusel de clientes 1.5x más rápido y retoma a los 1.5 s. El vuelto en el recojo "se coordina por chat" en todas partes.
+- **Revisión final antes de publicar** (19-oct): sin costos ni claves en el repositorio; 142 archivos (fotos, videos, íconos) cargan; 29 fichas sin textos raros; los 4 envíos probados en celular sin que nada se salga del recuadro; sin errores en la consola.

@@ -1342,7 +1342,7 @@ function detalleEnvioHTML(id, ped){
   if(id === 'recojo'){
     h += '<div class="chips">' + (cfg.PUNTOS_RECOJO || []).map((pt, i) =>
       '<label class="chip' + (i === puntoRecojo ? ' activo' : '') + '"><input type="radio" name="punto" value="' + i + '"' + (i === puntoRecojo ? ' checked' : '') + '>' + esc(pt) + '</label>').join('') + '</div>' +
-      '<p class="nota-chica">Coordinamos el día y la hora por chat. Pagas al recibir (o por adelantado, si prefieres).</p>' +
+      '<p class="nota-chica">Coordinamos el día y la hora por chat. Pagas al recibir (o por adelantado, si prefieres). Si pagas en efectivo, el vuelto se coordina por chat.</p>' +
       (((cfg.ENVIOS || []).find(x => x.id === 'recojo') || {}).mapa ? '<a class="mapa-link" target="_blank" rel="noopener" href="' + esc(cfg.ENVIOS.find(x => x.id === 'recojo').mapa.url) + '">' + esc(cfg.ENVIOS.find(x => x.id === 'recojo').mapa.texto) + '</a>' : '');
   }
   if(id === 'moto'){
@@ -1809,7 +1809,7 @@ function renderClientes(){
   if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   let pausa = false, reanudar = null;
   const parar = () => { pausa = true; clearTimeout(reanudar); };
-  const seguir = () => { clearTimeout(reanudar); reanudar = setTimeout(() => { pausa = false; }, 2500); };
+  const seguir = () => { clearTimeout(reanudar); reanudar = setTimeout(() => { pausa = false; }, 1500); };
   ['pointerdown', 'touchstart', 'wheel', 'mouseenter'].forEach(ev => pista.addEventListener(ev, parar, {passive: true}));
   ['pointerup', 'touchend', 'mouseleave'].forEach(ev => pista.addEventListener(ev, seguir, {passive: true}));
   // Avanza de la foto 1 a la 13 y vuelve a empezar sin corte (son dos vueltas
@@ -1817,7 +1817,7 @@ function renderClientes(){
   // con decimales aparte, porque algunos celulares redondean scrollLeft y el
   // carrusel se quedaba quieto.
   let previo = null, pos = 0;
-  const VELOCIDAD = 0.04;   // px por milisegundo (~40 px por segundo)
+  const VELOCIDAD = 0.06;   // px por milisegundo (~60 px por segundo)
   const paso = t => {
     const mitad = pista.scrollWidth / 2;
     if(previo !== null && mitad > pista.clientWidth){
