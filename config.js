@@ -68,16 +68,17 @@ const CATALOGO_CONFIG = {
 
   // Delivery con motorizado: costo por distrito. "min"/"max" cuando depende de la
   // zona; "h48" = llega en 48 horas; "nota" se muestra al cliente; "cerca" =
-  // cerca de San Miguel: se sugiere el recojo sin costo o InDrive.
+  // cerca de San Miguel: se sugiere el recojo sin costo en Plaza San Miguel o InDrive;
+  // "indrive" = solo se recomienda InDrive (Cercado de Lima).
   // Lo que pasa de S/15 muestra a Shalom como opción recomendada.
   DISTRITOS: [
     {n: 'San Isidro', min: 10}, {n: 'Lince', min: 10}, {n: 'Jesús María', min: 10},
     {n: 'Pueblo Libre', min: 10, cerca: true}, {n: 'Breña', min: 10},
     {n: 'San Miguel', min: 10, cerca: true}, {n: 'Magdalena del Mar', min: 10, alias: ['magdalena'], cerca: true},
-    {n: 'Cercado de Lima', min: 10, alias: ['lima', 'cercado', 'lima cercado']},
+    {n: 'Cercado de Lima', min: 10, alias: ['lima', 'cercado', 'lima cercado'], indrive: true},
     {n: 'Surquillo', min: 10}, {n: 'Santiago de Surco', min: 10, alias: ['surco']},
     {n: 'Miraflores', min: 10}, {n: 'San Luis', min: 10}, {n: 'La Victoria', min: 10}, {n: 'San Borja', min: 10},
-    {n: 'San Martín de Porres', min: 10, max: 15, nota: 'Oquendo (zona alejada): S/15', alias: ['smp']},
+    {n: 'San Martín de Porres', min: 10, max: 15, nota: 'Oquendo (zona alejada): S/15', alias: ['smp'], cerca: true},
     {n: 'Comas', min: 10}, {n: 'Los Olivos', min: 10}, {n: 'Independencia', min: 10},
     {n: 'Chorrillos', min: 10}, {n: 'Barranco', min: 10},
     {n: 'Villa María del Triunfo', min: 13, max: 16, nota: 'José Gálvez: S/16', alias: ['vmt']},
@@ -87,7 +88,7 @@ const CATALOGO_CONFIG = {
     {n: 'Ate', min: 10, max: 18, nota: 'Huaycán: S/18 · Santa Clara: S/16', alias: ['ate vitarte', 'vitarte']},
     {n: 'Santa Anita', min: 10},
     {n: 'Callao', min: 10, max: 16, cerca: true, nota: 'Hasta Óvalo 200 Millas: S/10 · Oquendo: S/15 · Márquez: S/16'},
-    {n: 'Bellavista', min: 10}, {n: 'Carmen de la Legua', min: 10}, {n: 'La Perla', min: 10}, {n: 'La Punta', min: 15},
+    {n: 'Bellavista', min: 10, cerca: true}, {n: 'Carmen de la Legua', min: 10}, {n: 'La Perla', min: 10}, {n: 'La Punta', min: 15},
     {n: 'Puente Piedra', min: 15}, {n: 'Carabayllo', min: 15},
     {n: 'Ventanilla', min: 18, h48: true}, {n: 'Chaclacayo', min: 18},
     {n: 'Lurigancho (Chosica)', min: 18, h48: true, alias: ['chosica', 'lurigancho']},

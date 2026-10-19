@@ -52,7 +52,7 @@ body{
   min-height:100vh;
 }
 /* Con una ficha o el carrito abiertos, el fondo no debe moverse al deslizar. */
-body.sin-scroll{overflow:hidden;}
+body.sin-scroll{overflow:hidden;position:fixed;left:0;right:0;width:100%;}
 a{color:inherit;}
 button{font-family:inherit;}
 .mono{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;}
@@ -1406,3 +1406,16 @@ body.hay-promos .solo-promos{display:inline;}
 
 /* Sin zoom por doble toque en toda la página (el zoom solo vive en las fotos de la ficha) */
 html{touch-action:manipulation;}
+
+/* Filas que se deslizan de lado (Más vendidos, combos, clientes…): solo de lado.
+   Antes la animación de aparecer hacía que la fila también se moviera arriba/abajo
+   (salía una barrita) y el bloque de fotos "se agarraba" con el dedo. */
+.fila,.combos,.combo-tira,.cats,.clientes-pista,.galeria-pista{overflow-y:hidden;overscroll-behavior-x:contain;}
+.prod img,.combo img,.clientes-pista img{-webkit-user-drag:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+
+/* Lista de distritos: al deslizarla se mueve SOLO la lista, no la página de atrás. */
+.cd-lista{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
+
+/* Con una ventana abierta (ficha, carrito, combo) la página de atrás queda fija. */
+html.sin-scroll{overflow:hidden;}
+.overlay{overscroll-behavior:contain;}

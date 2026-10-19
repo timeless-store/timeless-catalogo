@@ -894,10 +894,32 @@ function animarTarjetas(raiz){
 // dirección se reserva para la ficha y el carrito.
 // Baja a una sección dejando su título visible debajo de la cabecera fija (antes
 // la cabecera tapaba el título y se veía desde la primera foto).
+// Con la ficha, el carrito o un combo abiertos, la página de atrás queda FIJA: al
+// deslizar se mueve solo la ventana. (En iPhone "overflow:hidden" no basta, por eso
+// se fija el body donde estaba y al cerrar se vuelve a esa misma altura.)
+let fondoBloqueado = false, fondoY = 0;
+function bloquearFondo(si){
+  if(si === fondoBloqueado) return;
+  fondoBloqueado = si;
+  const b = document.body;
+  if(si){
+    fondoY = window.scrollY;
+    b.style.top = -fondoY + 'px';
+    b.classList.add('sin-scroll');
+    document.documentElement.classList.add('sin-scroll');
+  } else {
+    b.classList.remove('sin-scroll');
+    document.documentElement.classList.remove('sin-scroll');
+    b.style.top = '';
+    window.scrollTo({top: fondoY, behavior: 'instant'});
+  }
+}
 function irASeccion(id){
   const sec = document.getElementById(id) || document.getElementById('catalogo');
   if(!sec) return;
   const alto = document.querySelector('.top').getBoundingClientRect().height;
+  // Con una ventana abierta la página está fija: se anota a dónde ir y se va al cerrarla.
+  if(fondoBloqueado){ fondoY = sec.getBoundingClientRect().top + fondoY - alto - 8; return; }
   window.scrollTo({top: sec.getBoundingClientRect().top + window.scrollY - alto - 8, behavior: 'smooth'});
 }
 document.addEventListener('click', e => {
@@ -1056,6 +1078,7 @@ function cerrarListaDistrito(cd){
 function aplicarDistrito(cd, valor){
   distritoTxt = valor;
   guardarDistrito();
+  cd.querySelector('.cd-input').value = valor;   // el campo muestra el nombre completo
   cerrarListaDistrito(cd);
   if(cd.dataset.cd === 'distritoHome'){
     const c = document.getElementById('cotizHome');
@@ -1066,14 +1089,26 @@ document.addEventListener('input', e => {
   const inp = e.target.closest('.cd-input');
   if(inp) pintarListaDistrito(inp.closest('.cd'), false);
 });
-document.addEventListener('focusin', e => {
-  const inp = e.target.closest('.cd-input');
-  if(inp && inp.value) { inp.select(); }
+// Tocar el campo solo deja escribir (ya NO selecciona todo el texto: eso movía la
+// página y sacaba el menú de copiar).
+// Elegir un distrito: se elige al TOCAR y soltar (click). Antes se elegía apenas el
+// dedo tocaba la lista, así que al querer deslizarla para ver más distritos se
+// elegía uno sin querer, la lista se cerraba y se movía la página de atrás (y el
+// toque caía en lo que estaba detrás: "toco Bellavista y se selecciona lo de atrás").
+let tocandoOpcion = null;
+document.addEventListener('click', e => {
+  const op = e.target.closest('.cd-opcion');
+  if(!op) return;
+  tocandoOpcion = null;
+  aplicarDistrito(op.closest('.cd'), op.dataset.valor);
 });
-// pointerdown (y no click) para ganarle al cierre del teclado al soltar el dedo.
+document.addEventListener('pointercancel', () => { tocandoOpcion = null; });
 document.addEventListener('pointerdown', e => {
   const op = e.target.closest('.cd-opcion');
-  if(op){ e.preventDefault(); aplicarDistrito(op.closest('.cd'), op.dataset.valor); return; }
+  // Se marca que el dedo está en la lista (para que al salir del campo no se aplique
+  // lo escrito a medias, "Bell", antes de elegir "Bellavista").
+  if(op){ tocandoOpcion = op; return; }
+  tocandoOpcion = null;
   const fl = e.target.closest('.cd-flecha');
   if(fl){
     e.preventDefault();
@@ -1088,7 +1123,9 @@ document.addEventListener('pointerdown', e => {
 document.addEventListener('change', e => {
   const inp = e.target.closest('.cd-input');
   if(!inp) return;
-  const cd = inp.closest('.cd'), d = buscarDistrito(inp.value);
+  const cd = inp.closest('.cd');
+  if(tocandoOpcion && cd.contains(tocandoOpcion)) return;   // está eligiendo de la lista
+  const d = buscarDistrito(inp.value);
   aplicarDistrito(cd, d ? d.n : inp.value.trim());
 });
 document.addEventListener('keydown', e => {
@@ -1120,6 +1157,7 @@ function cotizacionHTML(txt, gratis, enCarrito){
   if(gratis && r.max > cubreGratis()) h += '<div class="cotiz-nota cotiz-aviso"><b class="excl">!</b> A tu zona el envío gratis cubre hasta ' + fmtPrecio(cubreGratis()) +
     ': pagas solo la diferencia. Por Shalom es 100% gratis.</div>';
   if(d.cerca) h += cercaHTML('moto', enCarrito);
+  else if(d.indrive) h += indriveHTML(enCarrito);
   if(r.max > RECOMENDAR_SHALOM_DESDE){
     h += '<div class="recomendado"><b>Opción recomendada: Shalom, ' + (gratis ? 'gratis' : fmtPrecio(costoShalom())) + '</b>' +
       '<span>Sale más barato a tu distrito. Pagas el producto antes, el envío al recibir, y lo recoges cuando puedas en tu agencia.</span>' +
@@ -1128,7 +1166,14 @@ function cotizacionHTML(txt, gratis, enCarrito){
   return h + '</div>';
 }
 
-// Distritos cerca de San Miguel (San Miguel, Magdalena, Pueblo Libre, Callao): se
+// Distritos donde conviene InDrive pero no tanto el recojo (Cercado de Lima).
+function indriveHTML(enCarrito){
+  return '<div class="recomendado"><b>Recomendado: envío por InDrive</b>' +
+    '<span>A tu distrito suele salir rápido y a buen precio: te lo cotizamos por chat antes de pagar. Si prefieres pagar al recibir, el delivery de 11am a 7pm sigue disponible.</span>' +
+    (enCarrito ? '<span class="recomendado-btns"><button type="button" class="btn-link" data-envio="indrive">Cambiar a InDrive</button></span>' : '') + '</div>';
+}
+// Distritos cerca de San Miguel (San Miguel, Magdalena, Pueblo Libre, Callao,
+// Bellavista, San Martín de Porres): se
 // sugiere el recojo sin costo en Plaza San Miguel o InDrive (casi siempre sale menos
 // de S/10). Es solo una sugerencia: el delivery contraentrega sigue disponible.
 function cercaHTML(desde, enCarrito){
@@ -1991,7 +2036,7 @@ function ruta(){
   fichaOv.hidden = abierto !== fichaOv;
   carritoOv.hidden = abierto !== carritoOv;
   comboOv.hidden = abierto !== comboOv;
-  document.body.classList.toggle('sin-scroll', !!abierto);
+  bloquearFondo(!!abierto);
   if(abierto === fichaOv) renderFicha(indiceNuevo);
   if(abierto === carritoOv) renderCarrito();
   if(abierto === comboOv) renderCombo();
