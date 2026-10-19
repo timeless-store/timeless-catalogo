@@ -48,7 +48,7 @@ body{
   margin:0;
   background:var(--bg);
   color:var(--bone);
-  font-family:"Montserrat",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   min-height:100vh;
 }
 /* Con una ficha o el carrito abiertos, el fondo no debe moverse al deslizar. */
@@ -520,7 +520,9 @@ button{font-family:inherit;}
 }
 .info-pop p{margin:6px 0 0;}
 .info-pop img{display:block;width:100%;border-radius:8px;margin:8px 0;}
-.info:hover .info-pop,.info.abierto .info-pop{display:block;}
+/* En PC se abre al pasar el cursor; en celular solo al tocar (y se cierra al tocar de nuevo). */
+@media (hover:hover) and (pointer:fine){ .info:hover .info-pop{display:block;} }
+.info.abierto .info-pop{display:block;}
 .guia-talla{
   margin-top:14px;
   padding:12px 14px;
@@ -1031,15 +1033,6 @@ label.chip:focus-within{outline:2px solid var(--accent);outline-offset:2px;}
 }
 .combo-tira video{object-fit:contain;}
 
-/* ---------- Títulos con letra gótica (combina con el logo) ---------- */
-.hero h1,.cat-titulo,.pagina h1{
-  font-family:"Grenze Gotisch","Montserrat",serif;
-  font-weight:700;
-  letter-spacing:0;
-}
-.hero h1{font-size:clamp(34px, 8vw, 54px);line-height:1.02;}
-.cat-titulo{font-size:28px;}
-.cat-cuenta{font-family:"Montserrat",sans-serif;}
 
 /* ---------- Escríbenos: WhatsApp o Instagram ---------- */
 .escribenos{position:relative;flex:1 1 150px;display:flex;}
@@ -1089,3 +1082,93 @@ label.chip:focus-within{outline:2px solid var(--accent);outline-offset:2px;}
   background:var(--chip);
 }
 @media (min-width:640px){ .clientes-pista img{height:340px;} }
+
+/* "?" en celular: el globo va centrado en la pantalla (antes se cortaba a la mitad) */
+@media (max-width:640px){
+  .info-pop{
+    position:fixed;
+    left:16px;
+    right:16px;
+    top:50%;
+    transform:translateY(-50%);
+    width:auto;
+    max-height:70vh;
+    overflow:auto;
+    z-index:60;
+    font-size:14px;
+  }
+}
+
+/* Escríbenos: botones chicos y rectangulares */
+.escribenos-menu{flex-direction:row;gap:6px;padding:6px;}
+.escribenos-menu .btn{min-height:38px;padding:0 12px;font-size:13px;border-radius:10px;flex:1;}
+
+/* Campos del carrito: que nada se salga del recuadro en celular */
+.campo input,.campo select{min-width:0;max-width:100%;box-sizing:border-box;}
+.campo input[type=date]{-webkit-appearance:none;appearance:none;display:block;width:100%;}
+.campo select{
+  min-height:44px;
+  padding:0 12px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:var(--card);
+  color:var(--bone);
+  font-size:16px;
+  font-family:inherit;
+  width:100%;
+}
+.tachado{color:var(--muted);font-weight:600;margin-right:4px;}
+.envio-extra{margin:8px 0 0;font-size:12px;color:var(--muted);}
+
+/* Datos del envío plegados (se abren con la flechita) */
+details.datos-form{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--card);}
+details.datos-form > summary{
+  cursor:pointer;
+  list-style:none;
+  padding:12px 24px 12px 0;
+  position:relative;
+  font-size:13px;
+  font-weight:800;
+}
+details.datos-form > summary::-webkit-details-marker{display:none;}
+details.datos-form > summary::after{content:"▾";position:absolute;right:0;top:50%;transform:translateY(-50%);color:var(--accent-txt);}
+details.datos-form[open] > summary::after{content:"▴";}
+details.datos-form[open]{padding-bottom:12px;}
+details.datos-form .opc{font-weight:500;color:var(--muted);}
+
+/* ---------- Video de fondo en el inicio ---------- */
+.hero{position:relative;overflow:hidden;isolation:isolate;background:#000;}
+.hero-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;}
+/* Velo oscuro para que el texto se lea encima del video */
+.hero-velo{
+  position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.72) 55%, rgba(0,0,0,.88) 100%);
+}
+.hero h1,.hero-eyebrow{color:#fff;}
+.hero p{color:rgba(255,255,255,.78);}
+.hero-chips li{background:rgba(0,0,0,.45);}
+
+/* ---------- Ficha: cantidad, restock, 316L, "Escríbenos por DM" ---------- */
+.cant-ficha{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:18px;padding:6px;border:1px solid var(--accent);border-radius:14px;
+}
+.cant-ficha button{
+  width:48px;height:44px;border-radius:10px;border:0;
+  background:var(--accent);color:#fff;font-size:22px;font-weight:800;cursor:pointer;
+}
+.cant-ficha button[disabled]{background:var(--chip);color:var(--muted);cursor:not-allowed;}
+.cant-ficha span{font-size:14px;}
+.btn-restock{background:var(--warn);border-color:var(--warn);color:#111;margin-top:10px;}
+.nota-316{display:block;margin-top:4px;font-size:12px;color:var(--muted);}
+.frase-talla .dm-link{
+  background:none;border:0;padding:0;cursor:pointer;font:inherit;
+  color:var(--accent-txt);font-weight:800;text-decoration:underline;text-underline-offset:3px;
+}
+.dm-menu{display:flex;gap:8px;justify-content:center;margin-top:10px;}
+.dm-menu .btn{width:auto;min-height:38px;margin:0;padding:0 16px;font-size:13px;border-radius:10px;}
+
+/* Fotos que todavía cargan: se ve "Cargando…" en vez de un cuadro negro */
+.galeria-pista img,.prod-foto img,.combo-tira img{
+  background:var(--chip) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='40'%3E%3Ctext x='110' y='25' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%238a8680'%3ECargando foto…%3C/text%3E%3C/svg%3E") center no-repeat;
+}

@@ -9,7 +9,9 @@ const cfg = (typeof CATALOGO_CONFIG !== 'undefined') ? CATALOGO_CONFIG : {};
 const CARRITO_KEY = 'timeless_catalogo_carrito';
 const ENVIO_KEY = 'timeless_catalogo_envio';
 const CACHE_KEY = 'timeless_catalogo_productos';
-const CANT_MAX = 20;
+// Máximo por producto en el carrito. No se muestra el stock: si piden más de 1,
+// el carrito avisa "sujeto a disponibilidad" y Alberto confirma por chat.
+const CANT_MAX = 10;
 
 // Foto de reserva: se usa si un producto no tiene fotos o si un enlace está roto.
 const FOTO_VACIA = 'data:image/svg+xml,' + encodeURIComponent(
@@ -164,6 +166,7 @@ function filasAProductos(rows){
       material: col(r, 'material'),
       coleccion: col(r, 'coleccion'),
       cuidado: col(r, 'cuidado'),
+      empaque: col(r, 'empaque'),   // ej. "Cajita premium" o "Bolsa Ziploc"
       // Variantes: dos filas con el mismo Grupo se muestran como UN producto
       // con selector de opción (ej. Collar Gengar: Morado / Plateado).
       grupo: col(r, 'grupo'),
@@ -284,6 +287,7 @@ function resumirEstado(e, v){
   e.linea = (v.find(p => p.linea) || {}).linea || '';
   e.material = (v.find(p => p.material) || {}).material || '';
   e.coleccion = (v.find(p => p.coleccion) || {}).coleccion || '';
+  e.empaque = (v.find(p => p.empaque) || {}).empaque || '';
 }
 
 // Variante que representa a la entrada en la grilla: la primera con stock.
@@ -425,6 +429,21 @@ function promosDe(p, ahora){
   return PROMOS.filter(pr => pr.texto && promoActiva(pr, ahora) && enAlcance(pr, p)).map(pr => pr.texto);
 }
 
+/* ---------- Estadísticas (GoatCounter) ----------
+   Sin cookies y sin datos personales: solo cuenta visitas y acciones (ver un
+   producto, agregarlo, pedir "Avísame", cerrar el pedido). Se ve en
+   https://timeless.goatcounter.com. Si no está configurado, no hace nada. */
+function contar(path, titulo){
+  try{
+    if(cfg.GOATCOUNTER && window.goatcounter && window.goatcounter.count)
+      window.goatcounter.count({path: path, title: titulo || path, event: true});
+  }catch(e){}
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-contar]');
+  if(el) contar(el.dataset.contar, el.textContent.trim());
+});
+
 /* ---------- Carga de datos ---------- */
 const PROMOS_KEY = 'timeless_catalogo_promos';
 function fetchCSV(url){
@@ -549,6 +568,7 @@ function etiquetasHTML(e){
   if(l) out.push('<span class="etq etq-linea"' + (l.descripcion ? ' data-tip="' + esc(l.descripcion) + '"' : '') + '>' + esc(l.titulo) + '</span>');
   if(/^acero inoxidable/i.test(e.material)) out.push('<span class="etq">' + esc(/316l/i.test(e.material) ? 'Acero 316L' : 'Acero inoxidable') + '</span>');
   if(e.coleccion) out.push('<span class="etq etq-col">' + esc(e.coleccion) + '</span>');
+  if(/cajita/i.test(e.empaque || '')) out.push('<span class="etq">Cajita premium</span>');
   return out.length ? '<div class="etqs">' + out.join('') + '</div>' : '';
 }
 
@@ -782,7 +802,7 @@ function renderGrilla(){
     '<section class="cat" id="' + esc(g.id) + '">' +
     '<h2 class="cat-titulo">' + esc(g.nombre) + ' <span class="cat-cuenta">' + g.items.length + '</span></h2>' +
     '<div class="grilla">' + g.items.map(e => tarjetaHTML(e, ahora)).join('') + '</div>' +
-    (cfg.FRASE_TALLA ? '<p class="frase-talla">' + esc(cfg.FRASE_TALLA) + '</p>' : '') +
+    fraseTallaHTML(null) +
     '</section>'
   ).join('');
 }
@@ -862,9 +882,6 @@ const CAMPOS_DATOS = {
   shalom: [['nombres', 'Nombres y apellidos completos'], ['celular', 'Celular', 'tel'], ['dni', 'DNI', 'text', 'numeric'],
            ['departamento', 'Departamento'], ['provincia', 'Provincia'], ['distrito', 'Distrito'],
            ['agencia', 'Agencia de Shalom'], ['correo', 'Correo (opcional)', 'email']],
-  olva: [['nombres', 'Nombres y apellidos completos'], ['celular', 'Celular', 'tel'], ['dni', 'DNI', 'text', 'numeric'],
-         ['direccion', 'Dirección completa'], ['referencia', 'Referencia'], ['distrito', 'Distrito'],
-         ['provincia', 'Provincia'], ['departamento', 'Departamento']],
 };
 
 /* ---------- Costo de envío por distrito ---------- */
@@ -885,43 +902,59 @@ const costoShalom = () => cfg.SHALOM_COSTO || 8;
 // Desde cuánto conviene recomendar Shalom en vez del delivery.
 const RECOMENDAR_SHALOM_DESDE = 15;
 
+// Lista desplegable con TODOS los distritos (en orden alfabético) + "otro".
+function selectDistritoHTML(id, valor){
+  const lista = (cfg.DISTRITOS || []).slice().sort((a, b) => a.n.localeCompare(b.n, 'es'));
+  const elegido = buscarDistrito(valor);
+  return '<select id="' + id + '" data-distrito>' +
+    '<option value="">Elige tu distrito</option>' +
+    lista.map(d => '<option value="' + esc(d.n) + '"' + (elegido === d ? ' selected' : '') + '>' + esc(d.n) + '</option>').join('') +
+    '<option value="__otro"' + (valor === '__otro' ? ' selected' : '') + '>Otro / no aparece mi distrito</option>' +
+    '</select>';
+}
+
 // Recuadro con el costo aproximado del delivery a un distrito. Se usa en la
 // sección "Envíos y pagos" y en el carrito (ahí con el botón "Cambiar a Shalom").
+// Lo de "el envío gratis cubre hasta S/16" SOLO aparece si el distrito puede
+// costar más que eso (pedido de Alberto: no anunciarlo en ninguna otra parte).
 function cotizacionHTML(txt, gratis, enCarrito){
-  if(!norm(txt)) return '';
+  if(!txt) return '';
   const d = buscarDistrito(txt);
-  if(!d) return '<div class="cotiz cotiz-no">No encontramos ese distrito. Escríbenos y revisamos si llegamos, o elige Shalom (' +
+  if(!d) return '<div class="cotiz cotiz-no">¿No aparece tu distrito? Escríbenos y revisamos si llegamos, o elige Shalom (' +
     fmtPrecio(costoShalom()) + ' a todo el Perú).</div>';
   const r = rangoDistrito(d);
-  let h = '<div class="cotiz"><div class="cotiz-fila"><span>Delivery a ' + esc(d.n) + '</span><b>' + textoRango(r) + '</b></div>';
+  let h = '<div class="cotiz"><div class="cotiz-fila"><span>Delivery a ' + esc(d.n) + '</span><b>' +
+    (gratis && r.max <= cubreGratis() ? '<s class="tachado">' + textoRango(r) + '</s> Gratis' : textoRango(r)) + '</b></div>';
+  if(r.max === r.min && !gratis) h += '<div class="cotiz-nota">Tarifa fija.</div>';
   if(d.nota) h += '<div class="cotiz-nota">' + esc(d.nota) + '</div>';
   h += '<div class="cotiz-nota">' + (d.h48 ? 'Llega en 48 horas.' : 'Llega de un día para otro.') + ' Sujeto a cobertura: lo confirmamos por chat.</div>';
-  // Envío gratis: si la zona puede pasar de lo que cubre, va el aviso "!" (y Shalom, que sí es 100% gratis).
-  if(gratis) h += r.max > cubreGratis()
-    ? '<div class="cotiz-nota cotiz-aviso"><b class="excl">!</b> Tu envío gratis cubre hasta ' + fmtPrecio(cubreGratis()) + ': si tu zona sale más, pagas solo la diferencia. Por Shalom es 100% gratis.</div>'
-    : '<div class="cotiz-nota cotiz-ok">✓ Tu envío es gratis.</div>';
+  if(gratis && r.max > cubreGratis()) h += '<div class="cotiz-nota cotiz-aviso"><b class="excl">!</b> A tu zona el envío gratis cubre hasta ' + fmtPrecio(cubreGratis()) +
+    ': pagas solo la diferencia. Por Shalom es 100% gratis.</div>';
   if(r.max > RECOMENDAR_SHALOM_DESDE){
-    h += '<div class="recomendado"><b>Opción recomendada: Shalom, ' + fmtPrecio(costoShalom()) + '</b>' +
+    h += '<div class="recomendado"><b>Opción recomendada: Shalom, ' + (gratis ? 'gratis' : fmtPrecio(costoShalom())) + '</b>' +
       '<span>Sale más barato a tu distrito. Pagas el producto antes, el envío al recibir, y lo recoges cuando puedas en tu agencia.</span>' +
       (enCarrito ? '<button type="button" class="btn-link" data-envio="shalom">Cambiar a Shalom</button>' : '') + '</div>';
   }
   return h + '</div>';
 }
 
-// Costo del envío elegido: {texto, costo}. costo = null cuando no hay un número
-// fijo (depende de la zona o se cotiza por chat).
+// Costo del envío elegido: {texto, costo, tachado}. costo = null cuando no hay
+// un número fijo (depende de la zona o se cotiza por chat); "tachado" es el
+// precio normal que se muestra tachado cuando el pedido va con envío gratis.
 function envioEstimado(id, gratis){
   const cubre = cubreGratis();
   if(id === 'recojo') return {texto: 'Sin costo', costo: 0};
-  if(id === 'shalom') return gratis ? {texto: 'Gratis', costo: 0} : {texto: fmtPrecio(costoShalom()) + ' al recibir', costo: costoShalom()};
-  if(id === 'indrive' || id === 'olva') return {texto: gratis ? 'Gratis hasta ' + fmtPrecio(cubre) : 'Se cotiza por chat', costo: null};
+  if(id === 'shalom') return gratis ? {texto: 'Gratis', costo: 0, tachado: fmtPrecio(costoShalom())} : {texto: fmtPrecio(costoShalom()) + ' al recibir', costo: costoShalom()};
+  // InDrive: siempre se cotiza (el envío gratis aplica al delivery y a Shalom).
+  if(id === 'indrive') return {texto: 'Se cotiza por chat', costo: null};
   if(id === 'moto'){
     const d = buscarDistrito(distritoTxt);
-    if(!d) return {texto: 'desde ' + fmtPrecio(cfg.ENVIO_MINIMO_MOTO || 10), costo: null};
+    const desde = 'desde ' + fmtPrecio(cfg.ENVIO_MINIMO_MOTO || 10);
+    if(!d) return gratis ? {texto: 'Gratis', costo: null, tachado: desde} : {texto: desde, costo: null};
     const r = rangoDistrito(d);
     if(!gratis) return {texto: textoRango(r), costo: r.max === r.min ? r.min : null};
     const a = Math.max(0, r.min - cubre), b = Math.max(0, r.max - cubre);
-    if(b === 0) return {texto: 'Gratis', costo: 0};
+    if(b === 0) return {texto: 'Gratis', costo: 0, tachado: textoRango(r)};
     return a === b ? {texto: 'Pagas ' + fmtPrecio(a) + ' de diferencia', costo: a}
                    : {texto: 'Gratis o hasta ' + fmtPrecio(b) + ' de diferencia', costo: null};
   }
@@ -947,6 +980,34 @@ function avisoFecha(v){
 function fechaBonita(v){
   return new Date(v + 'T12:00:00').toLocaleDateString('es-PE', {weekday: 'long', day: 'numeric', month: 'long'});
 }
+
+// "¿No sabes si te queda? Escríbenos por DM…": "Escríbenos por DM" es un botón
+// que deja elegir WhatsApp (con el mensaje ya escrito) o Instagram (se copia y
+// se abre el chat). Con producto, el mensaje lo nombra.
+function fraseTallaHTML(producto){
+  return '<div class="frase-talla">¿No sabes si te queda? <button type="button" class="dm-link" data-dm="' + esc(producto || '') + '">Escríbenos por DM</button> y te ayudamos a elegir tu talla' +
+    '<div class="dm-menu" hidden></div></div>';
+}
+function textoDM(producto){
+  return producto ? '¡Hola Timeless! Quiero saber cómo me queda: ' + producto : '¡Hola Timeless! Quiero saber qué talla me queda';
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.dm-link');
+  if(b){
+    const menu = b.parentNode.querySelector('.dm-menu');
+    menu.innerHTML = '<a class="btn btn-wa" target="_blank" rel="noopener" href="' + esc(urlWhatsApp(textoDM(b.dataset.dm))) + '">WhatsApp</a>' +
+      '<button type="button" class="btn btn-ig" data-dm-ig="' + esc(b.dataset.dm) + '">Instagram</button>';
+    menu.hidden = !menu.hidden;
+    return;
+  }
+  const ig = e.target.closest('[data-dm-ig]');
+  if(ig){
+    // Se copia y se abre el chat en el mismo toque (si se abre después, el
+    // navegador lo bloquea como ventana emergente).
+    copiar(textoDM(ig.dataset.dmIg)).then(ok => toast(ok ? 'Mensaje copiado: pégalo en el chat' : 'Escríbenos el nombre del producto en el chat'));
+    window.open(urlInstagramChat(), '_blank', 'noopener');
+  }
+});
 
 // Botón "?" que muestra una explicación al pasar el cursor (PC) o al tocarlo (celular).
 function infoHTML(etiqueta, contenido){
@@ -977,6 +1038,7 @@ function agregar(id){
   // entra al carrito por ningún otro camino.
   if(!sePuedePedir(POR_ID[id])) return false;
   setCantidad(id, (carrito[id] || 0) + 1);
+  contar('carrito/' + id, 'Agregó al carrito: ' + POR_ID[id].nombre);
   return true;
 }
 // Líneas que sí van en el pedido: producto que existe y está disponible.
@@ -1035,7 +1097,8 @@ function textoPedido(){
       if(fechaEntrega && !avisoFecha(fechaEntrega)) t += '\nDía de entrega: ' + fechaBonita(fechaEntrega);
       t += '\nEl producto lo pago al recibir con: ' + pagoProducto;
     }
-    if(id === 'shalom' || id === 'indrive' || id === 'olva') t +='\nYapeo ' + fmtPrecio(ped.productos) + ' (productos) al ' + (y.numero || '') + ' y te envío la captura.';
+    if(id === 'indrive') t += '\nTe mando mi ubicación para que me cotices el envío.';
+    if(id === 'shalom') t +='\nYapeo ' + fmtPrecio(ped.productos) + ' (productos) al ' + (y.numero || '') + ' y te envío la captura.';
     const campos = (CAMPOS_DATOS[id] || []).filter(c => String(datos[c[0]] || '').trim());
     if(campos.length) t += '\n\nMis datos:\n' + campos.map(c => c[1].replace(/ \(.*\)$/, '') + ': ' + String(datos[c[0]]).trim()).join('\n');
   }
@@ -1057,17 +1120,18 @@ function avisoHTML(p){
   const estado = p.proximamente ? 'Próximamente' : (p.restock ? 'Restock en camino' : 'Agotado');
   return '<button type="button" class="btn" disabled>' + estado + '</button>' +
     '<p class="aviso-titulo">' + (p.proximamente || p.restock ? '¿Quieres que te avisemos cuando llegue?' : '¿Quieres que te avisemos cuando vuelva?') + '</p>' +
-    '<a class="btn btn-wa" href="' + esc(urlWhatsApp(textoAviso(p))) + '" target="_blank" rel="noopener">Avísame por WhatsApp</a>' +
+    '<a class="btn btn-wa" href="' + esc(urlWhatsApp(textoAviso(p))) + '" target="_blank" rel="noopener" data-contar="avisame/' + esc(p.id) + '">Avísame por WhatsApp</a>' +
     (avisoCopiado === p.id
       ? '<div class="copiado" style="margin-top:14px">✓ Mensaje copiado. Pégalo en el chat que se abre.</div>' +
         '<a class="btn" href="' + esc(urlInstagramChat()) + '" target="_blank" rel="noopener">Abrir chat de Instagram</a>'
-      : '<button type="button" class="btn" data-aviso-ig="' + esc(p.id) + '">Avísame por Instagram</button>' +
+      : '<button type="button" class="btn" data-aviso-ig="' + esc(p.id) + '" data-contar="avisame/' + esc(p.id) + '">Avísame por Instagram</button>' +
         '<p class="nota-chica aviso-ig">Ojo: si cambias tu usuario de Instagram o desactivas tu cuenta, no podremos avisarte. Por WhatsApp es más seguro.</p>');
 }
 
 /* ---------- Ficha de producto ---------- */
 let fichaEntradaId = null;   // qué ficha está abierta
 let fichaVarId = null;       // y qué variante (color) tiene elegida
+let avisoLento = false;      // ¿ya se avisó que la conexión está lenta?
 
 // Posición actual de la galería (0 = primera foto), para no perderla al repintar.
 function indiceGaleria(){
@@ -1113,6 +1177,8 @@ function renderFicha(indice){
           '</div></div>'
         : '') +
       '<div class="ficha-precios">' + preciosHTML(p, ahora) + '</div>' +
+      // Restock en camino: botón amarillo que baja al "Avísame".
+      (p.restock ? '<button type="button" class="btn btn-restock" data-ir-aviso>Restock en camino · Te avisamos apenas llegue</button>' : '') +
       (p.disponible && p.pocos ? '<div class="pocos">Últimas unidades</div>' : '') +
       (p.disponible ? cuentaHTML(p, ahora, 'ficha-cuenta') : '') +
       (p.envioGratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Envío gratis llevando este producto</div>' : '') +
@@ -1124,16 +1190,27 @@ function renderFicha(indice){
         (esCinturon && p.tallas
           ? '<div class="dato"><dt>Tallas de pantalón ' + infoHTML('¿Cómo saber tu talla?', '<b>¿Cómo saber tu talla?</b>' + guia) + '</dt><dd>' + esc(p.tallas) + '</dd></div>'
           : dato('Tallas', p.tallas)) +
-        dato('Material', p.material) +
+        (p.material
+          ? '<div class="dato"><dt>Material</dt><dd>' + esc(p.material) +
+            // El 316L se explica: es lo que justifica su precio.
+            (/316l/i.test(p.material) ? '<span class="nota-316">El 316L es el acero inoxidable más resistente: aguanta el agua, el sudor y el uso diario sin oxidarse ni perder su color.</span>' : '') +
+            '</dd></div>'
+          : '') +
+        dato('Empaque', p.empaque) +
         dato('Nota', p.nota) +
         dato('Cuidado', p.cuidado) +
       '</dl>' +
       (esCinturon && guia ? '<div class="guia-talla"><div class="guia-titulo">¿Cómo saber tu talla?</div>' + guia + '</div>' : '') +
       (p.disponible
-        ? '<button type="button" class="btn btn-primario" data-agregar="' + esc(p.id) + '">Agregar al carrito</button>'
-        : avisoHTML(p)) +
-      (enCarrito && p.disponible ? '<div class="en-carrito">Tienes ' + enCarrito + ' en tu carrito · <a href="#/carrito">Ver carrito</a></div>' : '') +
-      (cfg.FRASE_TALLA ? '<p class="frase-talla">' + esc(cfg.FRASE_TALLA) + '</p>' : '') +
+        // Ya en el carrito: el botón se vuelve "− cantidad +" (sin mover la ficha).
+        ? (enCarrito
+          ? '<div class="cant-ficha"><button type="button" data-ficha-cant="-1" aria-label="Quitar uno">−</button>' +
+            '<span><b>' + enCarrito + '</b> en tu carrito</span>' +
+            '<button type="button" data-ficha-cant="1" aria-label="Agregar uno"' + (enCarrito >= CANT_MAX ? ' disabled' : '') + '>+</button></div>' +
+            '<div class="en-carrito">' + (enCarrito > 1 ? 'Más de 1 unidad: sujeto a disponibilidad. ' : '') + '<a href="#/carrito">Ver carrito</a></div>'
+          : '<button type="button" class="btn btn-primario" data-agregar="' + esc(p.id) + '">Agregar al carrito</button>')
+        : '<div id="avisoFicha">' + avisoHTML(p) + '</div>') +
+      fraseTallaHTML(titulo) +
     '</div>';
   const pista = document.getElementById('galPista');
   if(varias){
@@ -1143,6 +1220,13 @@ function renderFicha(indice){
     }, {passive:true});
   }
   if(indice > 0) pista.scrollLeft = pista.clientWidth * indice;
+  // Si a los 6 s alguna foto no terminó de cargar, se avisa que es la conexión
+  // (para que no piensen que la página falla). Una vez por visita.
+  setTimeout(() => {
+    if(avisoLento) return;
+    const lentas = Array.prototype.filter.call(document.querySelectorAll('#galPista img'), i => !i.complete);
+    if(lentas.length){ avisoLento = true; toast('Tu conexión está lenta: las fotos pueden tardar un poco en cargar'); }
+  }, 6000);
 }
 
 document.getElementById('fichaBody').addEventListener('click', e => {
@@ -1167,12 +1251,22 @@ document.getElementById('fichaBody').addEventListener('click', e => {
     });
     return;
   }
+  // Restock en camino: baja al "¿Quieres que te avisemos?".
+  if(e.target.closest('[data-ir-aviso]')){
+    const a = document.getElementById('avisoFicha');
+    if(a) a.scrollIntoView({behavior: 'smooth', block: 'center'});
+    return;
+  }
   const add = e.target.closest('[data-agregar]');
-  if(add){
-    if(agregar(add.dataset.agregar)){
-      toast('Agregado al carrito');
-      renderFicha(indiceGaleria());
-    }
+  const mas = e.target.closest('[data-ficha-cant]');
+  if(add || mas){
+    if(add){ if(agregar(add.dataset.agregar)) toast('Agregado al carrito'); else return; }
+    else setCantidad(fichaVarId, (carrito[fichaVarId] || 0) + Number(mas.dataset.fichaCant));
+    // Se repinta sin mover la ficha (antes saltaba hasta la foto de arriba).
+    const sheet = document.querySelector('#fichaOverlay .sheet');
+    const top = sheet ? sheet.scrollTop : 0;
+    renderFicha(indiceGaleria());
+    if(sheet) sheet.scrollTop = top;
   }
 });
 
@@ -1181,21 +1275,25 @@ document.getElementById('fichaBody').addEventListener('click', e => {
 let pasoCarrito = 'lista';
 let copiadoOk = false;
 
-// Lo que se abre debajo de la opción de envío elegida.
+// Lo que se abre debajo de la opción de envío elegida. Los datos del cliente
+// van plegados (se abren con la flechita) para que pedir sea rápido.
+const datosAbiertos = {};   // id del envío -> ¿el bloque de datos está abierto?
 function detalleEnvioHTML(id, ped){
   const y = cfg.YAPE || {};
   const yape = (monto, para) => '<div class="yape"><div class="yape-monto">Yapea ' + monto + '</div>' +
     '<div>al <b class="mono">' + esc(y.numero || '') + '</b> · ' + esc(y.nombre || '') + '</div>' +
     '<div class="nota-chica">' + para + ' Luego envía la captura en el chat junto con tu pedido.</div></div>';
-  const campos = (titulo, extra) => '<div class="datos-form"><div class="variantes-titulo">' + titulo + ' (opcional)</div>' +
+  const campos = (titulo, antes, despues) => '<details class="datos-form" data-datos="' + id + '"' + (datosAbiertos[id] ? ' open' : '') + '>' +
+    '<summary>' + titulo + ' <span class="opc">(opcional)</span></summary>' +
     '<p class="nota-chica datos-opc">Si los llenas, llegan junto con tu pedido y es más rápido. Si prefieres, mándanoslos por chat.</p>' +
+    (antes || '') +
     (CAMPOS_DATOS[id] || []).map(c =>
       '<label class="campo"><span>' + esc(c[1]) + (c[0] === 'maps' ? ' ' + infoHTML('Cómo mandar tu ubicación',
         '<b>¿No tienes el link?</b> Mándanos por WhatsApp tu <b>ubicación actual</b> (no "en tiempo real"): se ve así 👇' +
         '<img src="img/ubicacion-actual.jpg" alt="Ejemplo de ubicación actual en WhatsApp" loading="lazy">' +
         'O en Google Maps busca tu casa → Compartir → Copiar enlace, y pégalo aquí.') : '') + '</span>' +
       '<input type="' + (c[2] || 'text') + '"' + (c[3] ? ' inputmode="' + c[3] + '"' : '') + ' data-dato="' + c[0] + '" value="' + esc(datos[c[0]] || '') + '" autocomplete="off"></label>'
-    ).join('') + (extra || '') + '</div>';
+    ).join('') + (despues || '') + '</details>';
   let h = '';
   if(id === 'recojo'){
     h += '<div class="chips">' + (cfg.PUNTOS_RECOJO || []).map((pt, i) =>
@@ -1205,32 +1303,31 @@ function detalleEnvioHTML(id, ped){
   if(id === 'moto'){
     const l = limitesFecha();
     const aviso = avisoFecha(fechaEntrega);
-    h += '<label class="campo"><span>Tu distrito</span><input id="distritoCarrito" list="listaDistritos" data-distrito value="' + esc(distritoTxt) + '" placeholder="Escribe o elige tu distrito" autocomplete="off"></label>' +
+    h += '<label class="campo"><span>Tu distrito</span>' + selectDistritoHTML('distritoCarrito', distritoTxt) + '</label>' +
       cotizacionHTML(distritoTxt, ped.gratis, true) +
       '<label class="campo"><span>¿Qué día lo quieres? (lunes a sábado, 11am a 7pm)</span><input type="date" data-fecha min="' + l.min + '" max="' + l.max + '" value="' + esc(fechaEntrega) + '"></label>' +
-      (aviso ? '<div class="cotiz cotiz-no">' + esc(aviso) + '</div>' : '') +
-      '<div class="variantes-titulo" style="margin-top:12px">El producto lo pagas al recibir con</div><div class="chips">' +
-      ['Yape', 'Efectivo (monto exacto)'].map(v => '<label class="chip' + (v === pagoProducto ? ' activo' : '') + '"><input type="radio" name="pagoprod" value="' + esc(v) + '"' + (v === pagoProducto ? ' checked' : '') + '>' + esc(v) + '</label>').join('') + '</div>';
+      '<p class="nota-chica">No hacemos envíos domingos ni feriados.</p>' +
+      (aviso ? '<div class="cotiz cotiz-no">' + esc(aviso) + '</div>' : '');
     if(ped.costoEnvio > 0) h += yape(fmtPrecio(ped.costoEnvio) + ' del envío', 'Así tu pedido queda separado (máximo 1 semana).');
     else if(ped.costoEnvio === 0) h += '<p class="nota-chica">Tu envío es gratis: te escribimos para confirmar y separar tu pedido.</p>';
-    else if(ped.gratis) h += '<p class="nota-chica">Tu envío gratis cubre hasta ' + fmtPrecio(cubreGratis()) + '. Te confirmamos por chat si tu zona tiene alguna diferencia.</p>';
-    else h += '<p class="nota-chica">Te confirmamos el costo exacto por chat y ahí yapeas solo el envío para separar tu pedido (máximo 1 semana).</p>';
-    h += campos('Tus datos para el delivery');
-  }
-  if(id === 'indrive'){
-    h += yape(fmtPrecio(ped.productos), 'Es el pago de tus productos; el envío lo pagas al recibir (te lo cotizamos por chat).') +
-      '<p class="nota-chica">Coordinamos el día y la hora por chat. Te mandamos foto al dejarlo con el conductor y el seguimiento en vivo.</p>' +
-      campos('Tus datos para el envío');
-  }
-  if(id === 'olva'){
-    h += yape(fmtPrecio(ped.productos), 'Es el pago de tus productos. El envío depende de tu ciudad: te lo cotizamos por chat y lo yapeas también antes de enviar.') +
-      '<p class="nota-chica">Te llega a tu casa, sin ir a una agencia. Te mandamos el código de seguimiento al registrarlo.</p>' +
-      campos('Tus datos para Olva');
+    else if(!ped.gratis) h += '<p class="nota-chica">Te confirmamos el costo exacto por chat y ahí yapeas solo el envío para separar tu pedido (máximo 1 semana).</p>';
+    // El medio de pago del producto es parte de los datos del delivery.
+    h += campos('Tus datos para el delivery', '',
+      '<div class="variantes-titulo" style="margin-top:12px">El producto lo pagas al recibir con</div><div class="chips">' +
+      ['Yape', 'Efectivo (monto exacto)'].map(v => '<label class="chip' + (v === pagoProducto ? ' activo' : '') + '"><input type="radio" name="pagoprod" value="' + esc(v) + '"' + (v === pagoProducto ? ' checked' : '') + '>' + esc(v) + '</label>').join('') + '</div>');
   }
   if(id === 'shalom'){
     h += yape(fmtPrecio(ped.productos), 'Es el pago de tus productos; el envío (' + (ped.gratis ? 'gratis' : fmtPrecio(costoShalom())) + ') lo pagas al recibir.') +
       '<p class="nota-chica">S/12 solo en algunas zonas de la selva. El día en que lo dejamos en Shalom se coordina por chat; te enviamos la guía y la clave al registrarlo y la boleta al dejarlo. ¿Lo quieres más rápido? Pregúntanos por el envío express por avión.</p>' +
-      campos('Datos para Shalom', '<p class="nota-chica">Los datos deben ser de una persona mayor de edad.</p>');
+      '<p class="nota-chica">¿Prefieres Olva Courier? Pregúntanos por chat.</p>' +
+      campos('Datos para Shalom', '', '<p class="nota-chica">Los datos deben ser de una persona mayor de edad.</p>');
+  }
+  if(id === 'indrive'){
+    h += '<p class="nota-chica"><b>Dentro de Lima.</b> Enviamos desde San Miguel: es lo más recomendado para distritos cercanos. ' +
+      'Antes de pagar, mándanos tu ubicación y te cotizamos el envío (si estás lejos puede salir más caro que el delivery). ' +
+      'Coordinamos el día y la hora por chat, y te mandamos foto al dejarlo con el conductor y el seguimiento en vivo.</p>' +
+      '<p class="nota-chica">Cuando confirmes, yapeas tus productos (' + fmtPrecio(ped.productos) + ') y el envío lo pagas al recibir.</p>' +
+      campos('Tus datos para el envío');
   }
   return h ? '<div class="envio-detalle">' + h + '</div>' : '';
 }
@@ -1311,16 +1408,16 @@ function renderCarrito(){
   // Cómo lo recibe: opcional. Al elegir una opción se abre su detalle (distrito,
   // fecha, datos, a cuánto yapear).
   const envios = cfg.ENVIOS || [];
-  const opcionHTML = (id, nombre, precio, pago, sel) =>
-    '<label class="opcion' + (sel ? ' sel' : '') + '"><input type="radio" name="envio" value="' + esc(id) + '"' + (sel ? ' checked' : '') + '>' +
+  const opcionHTML = (id, nombre, est, pago, sel) =>
+    '<label class="opcion' + (sel ? ' sel' : '') + '" data-opcion="' + esc(id) + '"><input type="radio" name="envio" value="' + esc(id) + '"' + (sel ? ' checked' : '') + '>' +
     '<span class="opcion-cuerpo"><span class="opcion-fila"><span class="opcion-nombre">' + esc(nombre) + '</span>' +
-    (precio ? '<span class="opcion-precio">' + esc(precio) + '</span>' : '') + '</span>' +
+    (est && est.texto ? '<span class="opcion-precio">' + (est.tachado ? '<s class="tachado">' + esc(est.tachado) + '</s> ' : '') + esc(est.texto) + '</span>' : '') + '</span>' +
     (pago ? '<span class="opcion-nota">' + esc(pago) + '</span>' : '') + '</span></label>' +
     (sel ? detalleEnvioHTML(id, ped) : '');
   const enviosHTML = envios.length && validas.length
     ? '<div class="envio-bloque"><div class="variantes-titulo">¿Cómo lo recibes? Cotiza tu envío</div>' +
-      envios.map(x => opcionHTML(x.id, x.nombre, envioEstimado(x.id, ped.gratis).texto, x.pago, envioSel === x.id)).join('') +
-      opcionHTML('', 'Lo coordino por chat', '', 'Te ayudamos a elegir la mejor opción.', !envioSel) +
+      envios.map(x => opcionHTML(x.id, x.nombre, envioEstimado(x.id, ped.gratis), x.pago, envioSel === x.id)).join('') +
+      opcionHTML('', 'Lo coordino por chat', null, 'Te ayudamos a elegir la mejor opción.', !envioSel) +
       '</div>'
     : '';
   const totalAprox = (ped.envio && ped.costoEnvio > 0)
@@ -1331,7 +1428,7 @@ function renderCarrito(){
   body.innerHTML = '<div class="sheet-pad"><h2>Tu pedido</h2>' + filas + promosHTML + enviosHTML +
     '<div class="resumen-total">' + totalAprox + '</div>' +
     (ped.gratis
-      ? '<div class="envio-gratis envio-gratis-caja">🚚 Tu pedido va con envío gratis (cubre hasta ' + fmtPrecio(cubreGratis()) + ')</div>'
+      ? '<div class="envio-gratis envio-gratis-caja">🚚 Envío gratis aplicado</div>'
       : '') +
     '<p class="nota-chica">El costo de envío es aproximado y se confirma por chat. Solo enviamos dentro del Perú. En cualquier opción también puedes pagar todo por adelantado.</p>' +
     (validas.length
@@ -1398,7 +1495,12 @@ function repintarCarrito(enfocar){
 }
 document.getElementById('carritoBody').addEventListener('change', e => {
   const t = e.target;
-  if(t.name === 'envio'){ envioSel = t.value; guardarEnvio(); repintarCarrito(); }
+  if(t.name === 'envio'){
+    envioSel = t.value; guardarEnvio(); repintarCarrito();
+    // Se muestra desde el comienzo de la opción elegida (no desde el fondo de sus datos).
+    const op = document.querySelector('#carritoBody .opcion.sel');
+    if(op) op.scrollIntoView({block: 'start'});
+  }
   else if(t.name === 'punto'){ puntoRecojo = Number(t.value) || 0; repintarCarrito(); }
   else if(t.name === 'pagoprod'){ pagoProducto = t.value; repintarCarrito(); }
   else if(t.hasAttribute('data-fecha')){ fechaEntrega = t.value; repintarCarrito(); }
@@ -1416,6 +1518,11 @@ document.getElementById('carritoBody').addEventListener('input', e => {
 });
 document.getElementById('carritoBody').addEventListener('click', e => {
   const t = e.target;
+  // Tocar otra vez la opción ya elegida la des-selecciona ("lo coordino por chat").
+  if(t.name === 'envio' && t.value && t.value === envioSel){ envioSel = ''; guardarEnvio(); repintarCarrito(); return; }
+  // Recordar si el cliente abrió o cerró sus datos (la flechita).
+  const sum = t.closest('.datos-form > summary');
+  if(sum){ const d = sum.parentNode; datosAbiertos[d.dataset.datos] = !d.open; return; }
   const cambio = t.closest('[data-envio]');
   if(cambio){ envioSel = cambio.dataset.envio; guardarEnvio(); repintarCarrito(); return; }
   const cant = t.closest('[data-cant]');
@@ -1428,6 +1535,7 @@ document.getElementById('carritoBody').addEventListener('click', e => {
   const canal = t.closest('[data-canal]');
   if(canal){
     const texto = textoPedido();
+    contar('cerrar-pedido/' + canal.dataset.canal, 'Cerró pedido por ' + canal.dataset.canal);
     if(canal.dataset.canal === 'whatsapp'){
       window.open(urlWhatsApp(texto), '_blank', 'noopener');
     } else {
@@ -1449,6 +1557,7 @@ function ruta(){
   let abierto = null;
   let indiceNuevo = 0;
   fichaEntradaId = h.indexOf('#/p/') === 0 ? fichaEntradaId : null;
+  if(h.indexOf('#/combo/') !== 0) comboAbierto = null;
   if(h.indexOf('#/p/') === 0){
     // El enlace puede ser el de un grupo (g-collar-gengar) o el de una variante.
     const clave = decodeURIComponent(h.slice(4));
@@ -1457,6 +1566,7 @@ function ruta(){
       if(fichaEntradaId !== e.id){
         fichaEntradaId = e.id;
         fichaVarId = (clave !== e.id && POR_ID[clave]) ? clave : repVariante(e).id;
+        contar('producto/' + fichaVarId, 'Vio: ' + POR_ID[fichaVarId].nombre);
         indiceNuevo = POR_ID[fichaVarId].indiceFoto;
       } else {
         indiceNuevo = indiceGaleria();   // repintado (ej. venció una oferta): se queda donde estaba
@@ -1464,7 +1574,9 @@ function ruta(){
       abierto = fichaOv;
     }
   } else if(h.indexOf('#/combo/') === 0){
-    comboAbierto = Number(h.slice(8));
+    const nuevoCombo = Number(h.slice(8));
+    if(nuevoCombo !== comboAbierto) contar('combo/' + nuevoCombo, 'Abrió un combo');
+    comboAbierto = nuevoCombo;
     abierto = comboOv;
   } else if(h === '#/carrito'){
     abierto = carritoOv;
@@ -1579,29 +1691,24 @@ function renderFranja(){
 function renderEnviosSeccion(){
   const cont = document.getElementById('enviosCards');
   if(!cont) return;
-  // Dos columnas que se llenan hacia abajo: la tarjeta corta de recojo no deja
-  // hueco, y InDrive queda justo debajo de ella (pedido de Alberto).
+  // Dos columnas que se llenan hacia abajo; leídas de izquierda a derecha quedan
+  // en el orden de config.js (recojo, delivery, Shalom, InDrive).
   const tarjetas = (cfg.ENVIOS || []).map(x =>
     '<div class="envio-card"><div class="envio-titulo">' + esc(x.nombre) + '</div>' +
     '<div class="envio-pago">' + esc(x.pago) + '</div><p>' + esc(x.texto) + '</p>' +
+    (x.extra ? '<p class="envio-extra">' + esc(x.extra) + '</p>' : '') +
     (x.id === 'moto'
-      ? '<label class="campo"><span>Cotiza tu envío</span><input id="distritoHome" list="listaDistritos" placeholder="Escribe o elige tu distrito" autocomplete="off" value="' + esc(distritoTxt) + '"></label>' +
+      ? '<label class="campo"><span>Cotiza tu envío</span>' + selectDistritoHTML('distritoHome', distritoTxt) + '</label>' +
         '<div id="cotizHome">' + cotizacionHTML(distritoTxt, false, false) + '</div>'
       : '') +
     '</div>');
   cont.innerHTML = [0, 1].map(c => '<div class="envios-col">' + tarjetas.filter((t, i) => i % 2 === c).join('') + '</div>').join('');
-  const lista = document.getElementById('listaDistritos');
-  if(lista) lista.innerHTML = (cfg.DISTRITOS || []).map(d => '<option value="' + esc(d.n) + '">').join('');
-  const inp = document.getElementById('distritoHome');
-  if(inp){
-    const act = () => {
-      distritoTxt = inp.value;
-      guardarDistrito();
-      document.getElementById('cotizHome').innerHTML = cotizacionHTML(distritoTxt, false, false);
-    };
-    inp.addEventListener('change', act);
-    inp.addEventListener('input', () => { if(buscarDistrito(inp.value) || !inp.value) act(); });
-  }
+  const sel = document.getElementById('distritoHome');
+  if(sel) sel.addEventListener('change', () => {
+    distritoTxt = sel.value;
+    guardarDistrito();
+    document.getElementById('cotizHome').innerHTML = cotizacionHTML(distritoTxt, false, false);
+  });
 }
 
 function renderTodo(){
@@ -1674,6 +1781,11 @@ function renderClientes(){
   requestAnimationFrame(paso);
 }
 renderClientes();
+// Quien pidió "menos movimiento" en su celular no ve el video moverse.
+(function(){
+  const v = document.querySelector('.hero-bg');
+  if(v && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches){ v.removeAttribute('autoplay'); v.pause(); }
+})();
 
 document.getElementById('pieInstagram').href = urlInstagram();
 document.getElementById('heroWa').href = urlWhatsApp('¡Hola Timeless! Quiero consultar por un producto');

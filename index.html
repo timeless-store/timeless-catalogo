@@ -31,11 +31,6 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 
-<!-- Tipografías: Grenze Gotisch para los títulos (gótica, combina con el logo) y
-     Montserrat para el texto (la misma del subtítulo del logo). -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@600;700&family=Montserrat:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -72,6 +67,9 @@
 
   <!-- Inicio: lo primero que ve el cliente. -->
   <section class="hero">
+    <!-- Video de fondo (collares en mesa), sin sonido. Se cambia en img/inicio-collares.mp4 -->
+    <video class="hero-bg" src="img/inicio-collares.mp4" poster="img/inicio-collares.jpg" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
+    <div class="hero-velo" aria-hidden="true"></div>
     <div class="hero-eyebrow">Catálogo 2026</div>
     <!-- Cuando haya anillos disponibles: "Cinturones, collares, pant chains, anillos y más" -->
     <h1>Cinturones, collares, pant chains y más</h1>
@@ -110,12 +108,11 @@
     <ul class="envios-notas">
       <li>Solo hacemos envíos dentro del Perú.</li>
       <li>En cualquier opción también puedes pagar todo por adelantado.</li>
-      <li>Tu pedido queda separado al pagar el envío (delivery) o el producto (Shalom, InDrive u Olva), hasta por 1 semana. Para más tiempo, coordínalo por chat.</li>
-      <li>Envío gratis (cinturones de la Línea Premium y promos): cubre hasta S/16 en delivery, InDrive u Olva, y el envío completo por Shalom. Si tu envío cuesta más, pagas solo la diferencia.</li>
+      <li>Tu pedido queda separado al pagar el envío (delivery) o el producto (Shalom o InDrive), hasta por 1 semana. Para más tiempo, coordínalo por chat.</li>
+      <li>Envío gratis (cinturones de la Línea Premium y promos): aplica al delivery con motorizado y a Shalom. Si tu zona está lejos, te avisamos si hay alguna diferencia.</li>
     </ul>
     <p class="frase-talla">Aceptamos Yape, Plin y transferencia. En efectivo: con el monto exacto en el delivery (el motorizado no lleva vuelto); en el recojo en San Miguel sí te damos vuelto.</p>
   </section>
-  <datalist id="listaDistritos"></datalist>
 
   <!-- Clientes: fotos de pedidos entregados (CLIENTES_FOTOS en config.js), en un carrusel que gira solo. -->
   <section class="cat" id="clientes">
@@ -131,20 +128,20 @@
       <summary>¿Cuánto demora en llegar mi pedido?</summary>
       <div class="faq-resp">
         <p><b>En Lima:</b> el recojo en San Miguel se coordina por chat, y a veces puede ser el mismo día. El envío express por InDrive llega el mismo día o en menos de 24 horas, según disponibilidad. El delivery con motorizado llega al día siguiente de dejarlo, de lunes a sábado de 11am a 7pm; a Ventanilla, Lurín, Lurigancho (Chosica), Ancón y Cieneguilla, en 48 horas.</p>
-        <p><b>En provincias:</b> por Shalom u Olva Courier, de 1 a 3 días según la ciudad, contados desde que dejamos tu pedido en la agencia (ese día lo coordinamos por chat). Te mandamos el código de seguimiento.</p>
+        <p><b>En provincias:</b> por Shalom, de 1 a 3 días según la ciudad, contados desde que dejamos tu pedido en la agencia (ese día lo coordinamos por chat). Te mandamos el código de seguimiento.</p>
       </div>
     </details>
     <details>
       <summary>¿Cómo pago?</summary>
       <div class="faq-resp">
         <p>Con Yape, Plin o transferencia. En efectivo: en el delivery con el monto exacto (el motorizado no lleva vuelto); en el recojo en San Miguel sí te damos vuelto.</p>
-        <p>En el recojo y en el delivery de Lima pagas el producto al recibir. Por Shalom, InDrive y Olva pagas el producto antes de enviar. En cualquier opción también puedes pagar todo por adelantado.</p>
+        <p>En el recojo y en el delivery de Lima pagas el producto al recibir. Por Shalom e InDrive pagas el producto antes de enviar. En cualquier opción también puedes pagar todo por adelantado.</p>
       </div>
     </details>
     <details>
       <summary>¿Cómo separo mi pedido?</summary>
       <div class="faq-resp">
-        <p>En delivery, adelantando el envío. Por Shalom, InDrive u Olva, pagando el producto. Lo separamos hasta por 1 semana; si lo necesitas para más adelante, coordínalo por chat.</p>
+        <p>En delivery, adelantando el envío. Por Shalom o InDrive, pagando el producto. Lo separamos hasta por 1 semana; si lo necesitas para más adelante, coordínalo por chat.</p>
       </div>
     </details>
     <details>
@@ -168,7 +165,7 @@
       <summary>¿Puedo cambiar mi producto?</summary>
       <div class="faq-resp">
         <p>Sí, dentro de las 48 horas de recibido, sin uso y en su empaque. Los envíos del cambio los cubres tú, y si el nuevo producto cuesta más, pagas la diferencia.</p>
-        <p><b>En Lima:</b> el motorizado te lleva el nuevo y recoge el anterior en la misma visita. <b>En provincias:</b> nos lo envías por Olva Courier, lo revisamos y te mandamos el nuevo. Todo se coordina por chat.</p>
+        <p><b>En Lima:</b> el motorizado te lleva el nuevo y recoge el anterior en la misma visita. <b>En provincias:</b> nos lo envías por Shalom u Olva, lo revisamos y te mandamos el nuevo. Todo se coordina por chat.</p>
       </div>
     </details>
     <details>
@@ -182,7 +179,7 @@
       <summary>¿Cuándo tengo envío gratis?</summary>
       <div class="faq-resp">
         <p>Solo si en el producto o en tu carrito dice <b>"Envío gratis"</b>. Si una promo trae envío gratis, aplica solo a ese combo, no a sus productos por separado.</p>
-        <p>El envío gratis cubre hasta S/16 en delivery, InDrive u Olva, y el envío completo por Shalom. Si tu envío cuesta más, pagas solo la diferencia.</p>
+        <p>Aplica al delivery con motorizado y a Shalom. Si tu zona está lejos, te avisamos si hay alguna diferencia. Por InDrive el envío se cotiza aparte.</p>
       </div>
     </details>
     <details>
@@ -232,6 +229,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<!-- Estadísticas sin cookies (GoatCounter): https://timeless.goatcounter.com -->
+<script data-goatcounter="https://timeless.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 <script>

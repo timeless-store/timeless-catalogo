@@ -138,3 +138,14 @@
 - Preguntas frecuentes: textos corregidos (cambios en 48 horas, vuelto, huecos, envío gratis) y una abierta a la vez.
 - **Azul marino**; títulos con letra gótica (Grenze Gotisch) y texto en Montserrat (la del logo).
 - Pant chains: "Aleación reforzada de alta calidad". Collares agotados en el orden de Alberto.
+
+## 13. Correcciones desde celular (19 de octubre)
+
+- Vuelve la letra de antes (sin Grenze/Montserrat).
+- Libro de Reclamaciones conectado (Google Forms). Estadísticas con GoatCounter (timeless.goatcounter.com): visitas, productos vistos, carrito, "Avísame", combos y pedidos cerrados.
+- Video de collares de fondo en el inicio (`img/inicio-collares.mp4`, 0.8 MB).
+- Envíos: recojo, delivery, Shalom (con nota de Olva por chat), InDrive (Lima, se cotiza primero). Olva ya no es opción.
+- "Cubre hasta S/16" solo aparece si el distrito elegido puede costar más. En el carrito: "Envío gratis aplicado" y el precio normal tachado.
+- Carrito: distritos en lista desplegable, datos del envío plegados (el pago Yape/efectivo va dentro), tocar otra vez una opción la des-elige, "no hacemos envíos domingos ni feriados".
+- Ficha: "− cantidad +" al agregar (máx. 10, "sujeto a disponibilidad"), sin saltar arriba; botón amarillo de restock; empaque (cajita premium / bolsa Ziploc); explicación del 316L; "Escríbenos por DM" con WhatsApp o Instagram; aviso de conexión lenta.
+- "?" centrado en celular y se cierra al tocarlo de nuevo. Botones de Escríbenos más chicos.

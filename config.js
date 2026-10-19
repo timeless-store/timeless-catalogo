@@ -56,8 +56,9 @@ const CATALOGO_CONFIG = {
 
   // ---------- ENVÍOS ----------
   // Solo enviamos dentro del Perú. Los costos son APROXIMADOS: se confirman por chat.
-  // El envío gratis (cinturones premium o promos) cubre hasta este monto en
-  // delivery, InDrive o Shalom; si el envío cuesta más, el cliente paga la diferencia.
+  // El envío gratis (cinturones premium o promos) aplica al recojo, al delivery
+  // con motorizado (hasta este monto: SOLO se menciona si el distrito puede
+  // costar más) y a Shalom. InDrive se cotiza por chat.
   ENVIO_GRATIS_CUBRE: 16,
   ENVIO_MINIMO_MOTO: 10,
   SHALOM_COSTO: 8,
@@ -94,22 +95,26 @@ const CATALOGO_CONFIG = {
 
   // Formas de recibir el pedido (el orden es el del carrito y el de la sección
   // "Envíos y pagos"). "id" no se cambia: lo usa el código.
+  // Olva Courier no va como opción (Alberto prefiere Shalom): solo una nota en Shalom.
   ENVIOS: [
     {id: 'recojo', nombre: 'Recojo sin costo', pago: 'Pago contraentrega',
      texto: 'En Plaza San Miguel o en Av. La Paz cdras. 6–8, San Miguel. Coordinamos el día y la hora por chat.'},
     {id: 'moto', nombre: 'Delivery con motorizado', pago: 'Pago contraentrega · adelantas solo el envío',
-     texto: 'A casi todo Lima Metropolitana, de lunes a sábado de 11am a 7pm. Elige tu distrito y te mostramos el costo aproximado (mínimo S/10). Adelantando el envío por Yape, tu pedido queda separado; el producto lo pagas al recibir.'},
-    {id: 'indrive', nombre: 'Envío express por InDrive', pago: 'Pagas el producto antes · el envío al recibir',
-     texto: 'Enviamos desde San Miguel; recomendado para distritos cercanos (a veces sale más barato que el motorizado). El costo y la hora se coordinan por chat. Te mandamos foto y el seguimiento en vivo.'},
+     texto: 'A casi todo Lima Metropolitana, de lunes a sábado de 11am a 7pm (no hacemos envíos domingos ni feriados). Elige tu distrito y te mostramos el costo aproximado. Adelantando el envío por Yape, tu pedido queda separado; el producto lo pagas al recibir.'},
     {id: 'shalom', nombre: 'Shalom — todo el Perú', pago: 'Pagas el producto antes · el envío al recibir',
-     texto: 'Envío S/8 que pagas al recibir (S/12 solo en algunas zonas de la selva). En Lima llega al día siguiente de dejarlo y lo recoges cuando puedas, en el horario de tu agencia. Te mandamos la guía y la clave al registrarlo.'},
-    {id: 'olva', nombre: 'Olva Courier — a tu casa', pago: 'Pagas productos y envío antes',
-     texto: 'Te llega a tu casa en todo el Perú, sin ir a una agencia. El envío depende de tu ciudad: te lo cotizamos por chat y pagas todo junto antes de enviar. Te mandamos el código de seguimiento.'},
+     texto: 'Envío S/8 que pagas al recibir (S/12 solo en algunas zonas de la selva). En Lima llega al día siguiente de dejarlo y lo recoges cuando puedas, en el horario de tu agencia. Te mandamos la guía y la clave al registrarlo.',
+     extra: '¿Prefieres Olva Courier? Pregúntanos por chat.'},
+    {id: 'indrive', nombre: 'Envío express por InDrive (Lima)', pago: 'Pagas el producto antes · el envío al recibir',
+     texto: 'Dentro de Lima. Enviamos desde San Miguel: recomendado para distritos cercanos. Mándanos tu ubicación y te cotizamos el envío antes de pagar; el día y la hora se coordinan por chat. Te mandamos foto y el seguimiento en vivo.'},
   ],
 
   // Link del Google Forms del Libro de Reclamaciones (lo crea Alberto). Vacío =
   // la página muestra el aviso de "falta el formulario".
-  LIBRO_RECLAMACIONES_FORM: '',
+  LIBRO_RECLAMACIONES_FORM: 'https://forms.gle/Pdt3bpxdMpRHXtVGA',
+
+  // Estadísticas (GoatCounter, sin cookies): https://timeless.goatcounter.com
+  // Vacío = no se cuenta nada.
+  GOATCOUNTER: 'timeless',
 
   // Fotos de clientes con sus pedidos (carrusel "Clientes"). Ej: 'img/clientes/1.jpg'.
   // Vacío = la sección dice "Muy pronto".
