@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- Sin zoom de la página (ni doble toque ni pellizco): el zoom solo existe en las fotos de los productos (ver app.js). -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Timeless Store — Catálogo</title>
 <meta name="description" content="Accesorios de streetwear en Lima: cinturones, collares, pant chains y más. Arma tu pedido, cotiza tu envío y lo coordinamos por WhatsApp o Instagram.">
 <link rel="canonical" href="https://timeless-store.github.io/timeless-catalogo/">
@@ -71,6 +72,7 @@
   <!-- Inicio: lo primero que ve el cliente. -->
   <section class="hero">
     <!-- Foto del inicio (img/inicio.jpg, foto general de varios productos): a la izquierda en PC y arriba en celular, con degradado morado-negro -->
+    <img class="hero-foto-fondo" src="img/inicio.jpg" alt="" aria-hidden="true">
     <img class="hero-foto" src="img/inicio.jpg" alt="" aria-hidden="true">
     <div class="hero-eyebrow">Catálogo 2026</div>
     <!-- Cuando haya anillos disponibles: "Cinturones, collares, pant chains, anillos y más" -->
@@ -79,7 +81,7 @@
     <!-- Aparece solo cuando hay promos activas (promos.csv) -->
     <div id="heroPromo"></div>
     <div class="hero-cta">
-      <a class="btn btn-primario" href="#catalogo" data-scroll="catalogo">Ver catálogo</a>
+      <a class="btn btn-primario" href="#catalogo" data-scroll="cat-mas-vendidos">Ver catálogo</a>
       <!-- Escríbenos: se elige WhatsApp o Instagram (Instagram abre directo el chat) -->
       <div class="escribenos">
         <button type="button" class="btn" id="escribenosBtn" aria-expanded="false" aria-controls="escribenosMenu">Escríbenos</button>
@@ -94,7 +96,6 @@
       <li><a href="#envios" data-scroll="envios">Puntos de recojo sin costo</a></li>
       <li><a href="#envios" data-scroll="envios">Contraentrega en Lima</a></li>
       <li><a href="#envios" data-scroll="envios">Envíos a todo el Perú por Shalom</a></li>
-      <li>Te ayudamos a elegir tu talla</li>
     </ul>
   </section>
 
@@ -173,15 +174,15 @@
     <details>
       <summary>¿Y si mi producto llega con una falla?</summary>
       <div class="faq-resp">
-        <p>Escríbenos apenas lo notes, con fotos o un video (lo ideal es dentro de las 48 horas de recibido). Lo revisamos y te damos una solución según el caso: cambio, otro producto o la devolución de tu dinero.</p>
-        <p>No hacemos devoluciones por cambio de opinión: para eso están los cambios.</p>
+        <p>Escríbenos <b>dentro de las 48 horas de recibido</b>, con fotos o un video de la falla. Pasado ese plazo ya no podemos atenderlo como falla. Lo revisamos y te damos una solución según el caso: cambio, otro producto o la devolución de tu dinero.</p>
+        <p>Revisamos cada caso: si el daño es por mal uso, golpes, caídas o roturas, no aplica cambio ni devolución. Tampoco hacemos devoluciones por cambio de opinión.</p>
       </div>
     </details>
     <details>
       <summary>¿Cuándo tengo envío gratis?</summary>
       <div class="faq-resp">
         <p>Solo si en el producto o en tu carrito dice <b>"Envío gratis"</b>.<span class="solo-promos"> Si una promo trae envío gratis, aplica solo a ese combo, no a sus productos por separado.</span></p>
-        <p>Aplica al delivery con motorizado y a Shalom. Si tu zona está lejos, te avisamos si hay alguna diferencia. Por InDrive el envío se cotiza aparte.</p>
+        <p>Aplica al delivery con motorizado y a Shalom. Si tu zona está lejos, te avisamos si hay alguna diferencia. Por InDrive también puede salir con envío gratis, pero se cotiza por chat, porque el costo varía según tu ubicación.</p>
       </div>
     </details>
     <details>

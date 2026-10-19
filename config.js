@@ -67,12 +67,13 @@ const CATALOGO_CONFIG = {
   PUNTOS_RECOJO: ['Plaza San Miguel', 'Av. La Paz cdras. 6–8, San Miguel'],
 
   // Delivery con motorizado: costo por distrito. "min"/"max" cuando depende de la
-  // zona; "h48" = llega en 48 horas; "nota" se muestra al cliente.
+  // zona; "h48" = llega en 48 horas; "nota" se muestra al cliente; "cerca" =
+  // cerca de San Miguel: se sugiere el recojo sin costo o InDrive.
   // Lo que pasa de S/15 muestra a Shalom como opción recomendada.
   DISTRITOS: [
     {n: 'San Isidro', min: 10}, {n: 'Lince', min: 10}, {n: 'Jesús María', min: 10},
-    {n: 'Pueblo Libre', min: 10}, {n: 'Breña', min: 10},
-    {n: 'San Miguel', min: 10}, {n: 'Magdalena del Mar', min: 10, alias: ['magdalena']},
+    {n: 'Pueblo Libre', min: 10, cerca: true}, {n: 'Breña', min: 10},
+    {n: 'San Miguel', min: 10, cerca: true}, {n: 'Magdalena del Mar', min: 10, alias: ['magdalena'], cerca: true},
     {n: 'Cercado de Lima', min: 10, alias: ['lima', 'cercado', 'lima cercado']},
     {n: 'Surquillo', min: 10}, {n: 'Santiago de Surco', min: 10, alias: ['surco']},
     {n: 'Miraflores', min: 10}, {n: 'San Luis', min: 10}, {n: 'La Victoria', min: 10}, {n: 'San Borja', min: 10},
@@ -85,7 +86,7 @@ const CATALOGO_CONFIG = {
     {n: 'La Molina', min: 10, max: 18, nota: 'Hasta Sol de La Molina: S/10 · Musa: S/18'},
     {n: 'Ate', min: 10, max: 18, nota: 'Huaycán: S/18 · Santa Clara: S/16', alias: ['ate vitarte', 'vitarte']},
     {n: 'Santa Anita', min: 10},
-    {n: 'Callao', min: 10, max: 16, nota: 'Hasta Óvalo 200 Millas: S/10 · Oquendo: S/15 · Márquez: S/16'},
+    {n: 'Callao', min: 10, max: 16, cerca: true, nota: 'Hasta Óvalo 200 Millas: S/10 · Oquendo: S/15 · Márquez: S/16'},
     {n: 'Bellavista', min: 10}, {n: 'Carmen de la Legua', min: 10}, {n: 'La Perla', min: 10}, {n: 'La Punta', min: 15},
     {n: 'Puente Piedra', min: 15}, {n: 'Carabayllo', min: 15},
     {n: 'Ventanilla', min: 18, h48: true}, {n: 'Chaclacayo', min: 18},

@@ -469,11 +469,29 @@ function saveCache(rows, key){
 
 // Pantalla negra de carga: se va apenas el catálogo está pintado (mínimo
 // 0.7 s para que no parpadee, y máximo 4 s por si algo tarda de más).
+// Si el cliente se fue al Libro de Reclamaciones (u otra página nuestra) y vuelve,
+// regresa al mismo lugar donde estaba, no al inicio. Se guarda solo por 30 min.
+const VOLVER_KEY = 'timeless_volver_scroll';
+function posicionGuardada(){
+  try{
+    const v = JSON.parse(sessionStorage.getItem(VOLVER_KEY) || 'null');
+    sessionStorage.removeItem(VOLVER_KEY);
+    return v && Date.now() - v.t < 30 * 60 * 1000 ? v.y : null;
+  }catch(e){ return null; }
+}
+let volverA = posicionGuardada();
+document.addEventListener('click', e => {
+  if(e.target.closest('.libro-link')){
+    try{ sessionStorage.setItem(VOLVER_KEY, JSON.stringify({y: window.scrollY, t: Date.now()})); }catch(err){}
+  }
+});
 function quitarCarga(){
   const c = document.getElementById('carga');
   if(!c || c.classList.contains('fuera')) return;
-  // Por si el navegador movió la página mientras cargaba: arranca arriba.
-  if(!location.hash) window.scrollTo(0, 0);
+  // Arranca arriba (el navegador a veces la movía mientras cargaba), salvo que
+  // el cliente esté volviendo de otra página nuestra: ahí vuelve a donde estaba.
+  if(volverA !== null){ window.scrollTo({top: volverA, behavior: 'instant'}); volverA = null; }
+  else if(!location.hash) window.scrollTo(0, 0);
   setTimeout(() => {
     c.classList.add('fuera');
     setTimeout(() => { if(c.parentNode) c.parentNode.removeChild(c); }, 600);
@@ -749,7 +767,7 @@ document.getElementById('comboBody').addEventListener('click', e => {
   // Combo agotado: vuelve a la sección de promos para elegir otro.
   if(e.target.closest('[data-otros-combos]')){
     cerrarHoja();
-    setTimeout(() => { const s = document.getElementById('promos'); if(s) s.scrollIntoView({behavior: 'smooth'}); }, 150);
+    setTimeout(() => irASeccion('promos'), 150);
     return;
   }
   const op = e.target.closest('[data-op]');
@@ -822,31 +840,78 @@ function renderGrilla(){
   nav.innerHTML = (promosPrimero ? navPromos + navMas : navMas + navPromos) +
     grupos.map(g => '<a href="#' + esc(g.id) + '" data-cat="' + esc(g.id) + '">' + esc(g.nombre) + '</a>').join('') +
     '<a href="#envios" data-cat="envios">Envíos y pagos</a><a href="#clientes" data-cat="clientes">Clientes</a><a href="#faq" data-cat="faq">Preguntas</a>';
-  main.innerHTML = (promosPrimero ? promosHTML + masHTML : masHTML + promosHTML) + grupos.map(g =>
-    '<section class="cat" id="' + esc(g.id) + '">' +
-    '<h2 class="cat-titulo">' + esc(g.nombre) + ' <span class="cat-cuenta">' + g.items.length + '</span></h2>' +
-    '<div class="grilla">' + g.items.map(e => tarjetaHTML(e, ahora)).join('') + '</div>' +
-    fraseTallaHTML(null) +
-    '</section>'
-  ).join('');
+  main.innerHTML = (promosPrimero ? promosHTML + masHTML : masHTML + promosHTML) + grupos.map(g => {
+    const hayAgotados = g.items.some(e => !e.disponible);
+    const verAgotados = !ocultarAgotados[g.id];
+    return '<section class="cat" id="' + esc(g.id) + '">' +
+      '<h2 class="cat-titulo">' + esc(g.nombre) + ' <span class="cat-cuenta">' + g.items.length + '</span></h2>' +
+      // Filtro: "En stock" siempre activo (verde); "Agotados" (rojo) se puede apagar
+      // y entonces dice "Ver agotados" y los agotados no se muestran.
+      (hayAgotados
+        ? '<div class="filtro-stock"><span class="filtro filtro-stock-on">En stock</span>' +
+          '<button type="button" class="filtro ' + (verAgotados ? 'filtro-agot-on' : 'filtro-agot-off') + '" data-agotados="' + esc(g.id) + '" aria-pressed="' + verAgotados + '">' +
+          (verAgotados ? 'Agotados' : 'Ver agotados') + '</button></div>'
+        : '') +
+      '<div class="grilla">' + g.items.filter(e => verAgotados || e.disponible).map(e => tarjetaHTML(e, ahora)).join('') + '</div>' +
+      // "¿No sabes si te queda?" solo donde hay talla: cinturones y anillos.
+      (CON_TALLA.indexOf(norm(g.nombre)) > -1 ? fraseTallaHTML(null) : '') +
+      '</section>';
+  }).join('');
+  marcarCargadas(main);
+  animarTarjetas(main);
+}
+// Categorías con talla (ahí va el "¿No sabes si te queda?").
+const CON_TALLA = ['cinturones', 'anillos'];
+// Agotados ocultos por categoría (id de la sección -> true). Empieza mostrando todo.
+const ocultarAgotados = {};
+document.getElementById('catalogo').addEventListener('click', e => {
+  const b = e.target.closest('[data-agotados]');
+  if(!b) return;
+  ocultarAgotados[b.dataset.agotados] = !ocultarAgotados[b.dataset.agotados];
+  renderGrilla();
+});
+
+/* Animación al bajar: las tarjetas aparecen (suben y se aclaran) al llegar a
+   ellas, una tras otra. Quien pidió "menos movimiento" en su celular no la ve. */
+let tarjetasObservador = null;
+function animarTarjetas(raiz){
+  if(!('IntersectionObserver' in window) || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  if(!tarjetasObservador){
+    tarjetasObservador = new IntersectionObserver(entradas => entradas.forEach(en => {
+      if(en.isIntersecting){ en.target.classList.add('visible'); tarjetasObservador.unobserve(en.target); }
+    }), {rootMargin: '0px 0px -8% 0px', threshold: 0.08});
+  }
+  raiz.querySelectorAll('.grilla, .fila, .combos').forEach(cont => {
+    Array.prototype.forEach.call(cont.children, (t, i) => {
+      t.classList.add('aparece');
+      t.style.transitionDelay = (i % 4) * 70 + 'ms';
+      tarjetasObservador.observe(t);
+    });
+  });
 }
 
 // Los atajos bajan con scroll en vez de cambiar la dirección: el "#" de la
 // dirección se reserva para la ficha y el carrito.
+// Baja a una sección dejando su título visible debajo de la cabecera fija (antes
+// la cabecera tapaba el título y se veía desde la primera foto).
+function irASeccion(id){
+  const sec = document.getElementById(id) || document.getElementById('catalogo');
+  if(!sec) return;
+  const alto = document.querySelector('.top').getBoundingClientRect().height;
+  window.scrollTo({top: sec.getBoundingClientRect().top + window.scrollY - alto - 8, behavior: 'smooth'});
+}
 document.addEventListener('click', e => {
   const s = e.target.closest('[data-scroll]');
   if(s){
     e.preventDefault();
-    const sec = document.getElementById(s.dataset.scroll);
-    if(sec) sec.scrollIntoView();
+    irASeccion(s.dataset.scroll);
   }
 });
 document.getElementById('catsNav').addEventListener('click', e => {
   const a = e.target.closest('a[data-cat]');
   if(!a) return;
   e.preventDefault();
-  const sec = document.getElementById(a.dataset.cat);
-  if(sec) sec.scrollIntoView();
+  irASeccion(a.dataset.cat);
 });
 /* ---------- Fotos que van cambiando al pasar el cursor (solo en PC) ----------
    En celular no: ahí se toca la tarjeta para entrar a la ficha, y que todas las
@@ -1054,12 +1119,24 @@ function cotizacionHTML(txt, gratis, enCarrito){
   h += '<div class="cotiz-nota">' + (d.h48 ? 'Llega en 48 horas.' : 'Llega de un día para otro.') + ' Sujeto a cobertura: lo confirmamos por chat.</div>';
   if(gratis && r.max > cubreGratis()) h += '<div class="cotiz-nota cotiz-aviso"><b class="excl">!</b> A tu zona el envío gratis cubre hasta ' + fmtPrecio(cubreGratis()) +
     ': pagas solo la diferencia. Por Shalom es 100% gratis.</div>';
+  if(d.cerca) h += cercaHTML('moto', enCarrito);
   if(r.max > RECOMENDAR_SHALOM_DESDE){
     h += '<div class="recomendado"><b>Opción recomendada: Shalom, ' + (gratis ? 'gratis' : fmtPrecio(costoShalom())) + '</b>' +
       '<span>Sale más barato a tu distrito. Pagas el producto antes, el envío al recibir, y lo recoges cuando puedas en tu agencia.</span>' +
       (enCarrito ? '<button type="button" class="btn-link" data-envio="shalom">Cambiar a Shalom</button>' : '') + '</div>';
   }
   return h + '</div>';
+}
+
+// Distritos cerca de San Miguel (San Miguel, Magdalena, Pueblo Libre, Callao): se
+// sugiere el recojo sin costo en Plaza San Miguel o InDrive (casi siempre sale menos
+// de S/10). Es solo una sugerencia: el delivery contraentrega sigue disponible.
+function cercaHTML(desde, enCarrito){
+  const btn = (id, txt) => enCarrito ? '<button type="button" class="btn-link" data-envio="' + id + '">' + txt + '</button>' : '';
+  return '<div class="recomendado"><b>Te queda cerca de nosotros</b>' +
+    '<span>Puedes recogerlo <b>sin costo en Plaza San Miguel</b>' + (desde === 'moto' ? ', o pedirlo por <b>InDrive</b>, que casi siempre sale menos de S/10' : '') + '.' +
+    (desde === 'moto' ? ' Si prefieres pagar al recibir, el delivery de 11am a 7pm sigue disponible.' : '') + '</span>' +
+    '<span class="recomendado-btns">' + btn('recojo', 'Cambiar a recojo sin costo') + (desde === 'moto' ? btn('indrive', 'Cambiar a InDrive') : '') + '</span></div>';
 }
 
 // Costo del envío elegido: {texto, costo, tachado}. costo = null cuando no hay
@@ -1226,7 +1303,7 @@ function textoPedido(){
   else {
     let lugar = '';
     if(id === 'recojo') lugar = ' en ' + ((cfg.PUNTOS_RECOJO || [])[puntoRecojo] || '');
-    if(id === 'moto'){ const d = buscarDistrito(distritoTxt); lugar = d ? ' a ' + d.n : (distritoTxt ? ' a ' + distritoTxt : ''); }
+    if(id === 'moto' || id === 'indrive'){ const d = buscarDistrito(distritoTxt); lugar = d ? ' a ' + d.n : (distritoTxt ? ' a ' + distritoTxt : ''); }
     t += '\nEnvío: ' + ped.envio.nombre + lugar + ' (' + (ped.gratis && ped.est.texto !== 'Gratis' ? 'envío gratis · ' : '') + ped.est.texto + ')';
     if(ped.costoEnvio > 0) t += '\nTotal aprox.: ' + fmtPrecio(ped.productos + ped.costoEnvio);
     if(id === 'moto'){
@@ -1299,13 +1376,17 @@ function renderFicha(indice){
   const guia = (cfg.GUIA_TALLA || []).map(t => '<p>' + esc(t) + '</p>').join('');
   document.getElementById('fichaBody').innerHTML =
     '<div class="galeria"><div class="galeria-pista" id="galPista">' +
+      // Cada foto en su caja (con "Cargando…" hasta que esté completa) y cada video
+      // con el fondo borroso de su propio cuadro (archivo "-fondo.jpg" al lado del video).
       medios.map((f, i) => esVideo(f)
-        ? '<video src="' + esc(f) + '#t=0.1" controls muted playsinline preload="metadata" aria-label="Video de ' + esc(e.nombre) + '"></video>'
-        : '<img src="' + esc(f) + '" alt="' + esc(e.nombre) + ' — foto ' + (i + 1) + '">').join('') +
+        ? '<div class="vid-caja" style="background-image:url(&quot;' + esc(f.replace(/\.(mp4|webm|mov|m4v)$/i, '-fondo.jpg')) + '&quot;)">' +
+          '<video src="' + esc(f) + '#t=0.1" muted playsinline loop preload="metadata" aria-label="Video de ' + esc(e.nombre) + '"></video></div>'
+        : '<div class="foto-caja"><img src="' + esc(f) + '" alt="' + esc(e.nombre) + ' — foto ' + (i + 1) + '" draggable="false"></div>').join('') +
     '</div>' +
     (varias ? '<button type="button" class="galeria-nav galeria-prev" data-gal="-1" aria-label="Foto anterior">‹</button>' +
               '<button type="button" class="galeria-nav galeria-next" data-gal="1" aria-label="Foto siguiente">›</button>' +
               '<div class="galeria-cuenta mono" id="galCuenta">1/' + medios.length + '</div>' : '') +
+    '<button type="button" class="zoom-btn" id="zoomBtn" aria-label="Acercar la foto">+</button>' +
     '</div>' +
     '<div class="sheet-pad">' +
       '<div class="eyebrow">' + esc(e.categoria) + (e.nuevo && e.disponible ? ' · Nuevo' : '') + '</div>' +
@@ -1356,7 +1437,7 @@ function renderFicha(indice){
             '<div class="en-carrito">' + (enCarrito > 1 ? 'Más de 1 unidad: sujeto a disponibilidad. ' : '') + '<a href="#/carrito">Ver carrito</a></div>'
           : '<button type="button" class="btn btn-primario" data-agregar="' + esc(p.id) + '">Agregar al carrito</button>')
         : '<div id="avisoFicha">' + avisoHTML(p) + '</div>') +
-      fraseTallaHTML(titulo) +
+      (CON_TALLA.indexOf(norm(p.categoria)) > -1 ? fraseTallaHTML(titulo) : '') +
     '</div>';
   const pista = document.getElementById('galPista');
   if(varias){
@@ -1366,19 +1447,172 @@ function renderFicha(indice){
     }, {passive:true});
   }
   if(indice > 0) pista.scrollLeft = pista.clientWidth * indice;
-  // Si a los 6 s alguna foto no terminó de cargar, se avisa que es la conexión
-  // (para que no piensen que la página falla). Una vez por visita.
-  setTimeout(() => {
-    if(avisoLento) return;
-    const lentas = Array.prototype.filter.call(document.querySelectorAll('#galPista img'), i => !i.complete);
-    if(lentas.length){ avisoLento = true; toast('Tu conexión está lenta: las fotos pueden tardar un poco en cargar'); }
-  }, 6000);
+  prepararGaleria(pista);
 }
+
+/* ---------- Galería de la ficha: carga, videos y zoom ---------- */
+// Cada foto muestra "Cargando foto…" hasta que está completa; si a los 5 s no
+// terminó, avisa que es la conexión; si falla, lo intenta una vez más y, si
+// vuelve a fallar, lo dice (así no parece un error de la página).
+function marcarCargadas(raiz){
+  (raiz || document).querySelectorAll('.foto-caja img, .prod-foto img').forEach(img => {
+    if(img.complete && img.naturalWidth) img.parentNode.classList.add('cargada');
+  });
+}
+document.addEventListener('load', e => {
+  const img = e.target;
+  if(img.tagName !== 'IMG' || !img.parentNode || !img.parentNode.classList) return;
+  const caja = img.parentNode;
+  if(caja.classList.contains('foto-caja') || caja.classList.contains('prod-foto')){
+    caja.classList.remove('lenta', 'fallo');
+    caja.classList.add('cargada');
+  }
+}, true);
+
+let videoObservador = null;
+function prepararGaleria(pista){
+  marcarCargadas(pista);
+  setTimeout(() => pista.querySelectorAll('.foto-caja:not(.cargada)').forEach(c => c.classList.add('lenta')), 5000);
+
+  // Videos: se reproducen solos al llegar a ellos y se pausan al salir.
+  if(videoObservador) videoObservador.disconnect();
+  if('IntersectionObserver' in window){
+    videoObservador = new IntersectionObserver(entradas => entradas.forEach(en => {
+      const v = en.target;
+      if(en.isIntersecting && en.intersectionRatio > 0.6){ const p = v.play(); if(p && p.catch) p.catch(() => {}); }
+      else v.pause();
+    }), {root: pista, threshold: [0, 0.6, 1]});
+    pista.querySelectorAll('video').forEach(v => videoObservador.observe(v));
+  }
+  pista.querySelectorAll('video').forEach(v => {
+    // En pausa aparece la barra para moverse por el video; al reproducir, se esconde.
+    v.addEventListener('pause', () => { v.controls = true; });
+    v.addEventListener('play', () => { v.controls = false; });
+    v.addEventListener('click', () => { if(!v.paused && !v.controls){ v.pause(); } });
+  });
+
+  zoomReiniciar();
+  actualizarBotonZoom();
+  pista.addEventListener('scroll', () => {
+    if(zoom.escala > 1) return;
+    actualizarBotonZoom();
+  }, {passive: true});
+}
+
+/* Zoom: solo en las fotos de la ficha. Pellizco con dos dedos (hasta 5x) o el
+   botón + (2x; otro toque vuelve al tamaño normal). Con zoom, la foto se mueve
+   con el dedo (o arrastrando con el mouse) y la galería deja de deslizarse. */
+const ZOOM_MAX = 5, ZOOM_BOTON = 2;
+const zoom = {escala: 1, x: 0, y: 0, caja: null, pellizco: null, arrastre: null};
+function cajaActual(){
+  const pista = document.getElementById('galPista');
+  if(!pista) return null;
+  const i = Math.round(pista.scrollLeft / (pista.clientWidth || 1));
+  return pista.children[i] || null;
+}
+function actualizarBotonZoom(){
+  const b = document.getElementById('zoomBtn');
+  if(!b) return;
+  const c = cajaActual();
+  b.hidden = !(c && c.classList.contains('foto-caja'));
+  b.textContent = zoom.escala > 1 ? '−' : '+';
+  b.setAttribute('aria-label', zoom.escala > 1 ? 'Volver al tamaño normal' : 'Acercar la foto');
+}
+function limitarZoom(){
+  if(!zoom.caja) return;
+  const w = zoom.caja.clientWidth, h = zoom.caja.clientHeight;
+  const mx = (zoom.escala - 1) * w / 2, my = (zoom.escala - 1) * h / 2;
+  zoom.x = Math.max(-mx, Math.min(mx, zoom.x));
+  zoom.y = Math.max(-my, Math.min(my, zoom.y));
+}
+function pintarZoom(){
+  if(!zoom.caja) return;
+  limitarZoom();
+  const img = zoom.caja.querySelector('img');
+  img.style.transform = zoom.escala > 1 ? 'translate(' + zoom.x + 'px,' + zoom.y + 'px) scale(' + zoom.escala + ')' : '';
+  zoom.caja.classList.toggle('con-zoom', zoom.escala > 1);
+  const pista = document.getElementById('galPista');
+  if(pista) pista.classList.toggle('zoom-activo', zoom.escala > 1);
+  actualizarBotonZoom();
+}
+function zoomReiniciar(){
+  if(zoom.caja){
+    const img = zoom.caja.querySelector('img');
+    if(img) img.style.transform = '';
+    zoom.caja.classList.remove('con-zoom');
+  }
+  const pista = document.getElementById('galPista');
+  if(pista) pista.classList.remove('zoom-activo');
+  zoom.escala = 1; zoom.x = 0; zoom.y = 0; zoom.caja = null; zoom.pellizco = null; zoom.arrastre = null;
+}
+const distancia = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+// Celular: pellizco y arrastre con los dedos (eventos táctiles, para poder frenar el
+// deslizamiento de la galería mientras hay zoom).
+document.getElementById('fichaBody').addEventListener('touchstart', e => {
+  const caja = e.target.closest && e.target.closest('.foto-caja');
+  if(!caja) return;
+  if(e.touches.length === 2){
+    if(zoom.caja !== caja){ zoomReiniciar(); zoom.caja = caja; }
+    zoom.pellizco = {d: distancia(e.touches[0], e.touches[1]), s: zoom.escala};
+    e.preventDefault();
+  } else if(e.touches.length === 1 && zoom.escala > 1 && zoom.caja === caja){
+    zoom.arrastre = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+  }
+}, {passive: false});
+document.getElementById('fichaBody').addEventListener('touchmove', e => {
+  if(zoom.pellizco && e.touches.length === 2){
+    e.preventDefault();
+    zoom.escala = Math.max(1, Math.min(ZOOM_MAX, zoom.pellizco.s * distancia(e.touches[0], e.touches[1]) / zoom.pellizco.d));
+    pintarZoom();
+  } else if(zoom.arrastre && e.touches.length === 1 && zoom.escala > 1){
+    e.preventDefault();
+    const t = e.touches[0];
+    zoom.x += t.clientX - zoom.arrastre.x; zoom.y += t.clientY - zoom.arrastre.y;
+    zoom.arrastre = {x: t.clientX, y: t.clientY};
+    pintarZoom();
+  }
+}, {passive: false});
+document.getElementById('fichaBody').addEventListener('touchend', e => {
+  if(e.touches.length < 2) zoom.pellizco = null;
+  if(e.touches.length === 0) zoom.arrastre = null;
+  if(zoom.escala <= 1.03 && zoom.caja && !zoom.pellizco){ zoomReiniciar(); actualizarBotonZoom(); }
+});
+// PC: con zoom, la foto se arrastra con el mouse.
+document.getElementById('fichaBody').addEventListener('mousedown', e => {
+  const caja = e.target.closest('.foto-caja');
+  if(!caja || zoom.escala <= 1 || zoom.caja !== caja) return;
+  e.preventDefault();
+  zoom.arrastre = {x: e.clientX, y: e.clientY};
+});
+window.addEventListener('mousemove', e => {
+  if(!zoom.arrastre || e.buttons !== 1) return;
+  zoom.x += e.clientX - zoom.arrastre.x; zoom.y += e.clientY - zoom.arrastre.y;
+  zoom.arrastre = {x: e.clientX, y: e.clientY};
+  pintarZoom();
+});
+window.addEventListener('mouseup', () => { if(zoom.escala > 1) zoom.arrastre = null; });
+// Botón +/−
+document.getElementById('fichaBody').addEventListener('click', e => {
+  if(!e.target.closest('#zoomBtn')) return;
+  if(zoom.escala > 1){ zoomReiniciar(); actualizarBotonZoom(); return; }
+  const c = cajaActual();
+  if(!c || !c.classList.contains('foto-caja')) return;
+  zoom.caja = c; zoom.escala = ZOOM_BOTON; zoom.x = 0; zoom.y = 0;
+  pintarZoom();
+});
+// Fuera de las fotos no hay zoom: se bloquea el pellizco del navegador (Safari en
+// iPhone no respeta "user-scalable=no") y el doble toque (ver style.css).
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('touchmove', e => {
+  if(e.touches.length > 1 && !(e.target.closest && e.target.closest('.foto-caja'))) e.preventDefault();
+}, {passive: false});
 
 document.getElementById('fichaBody').addEventListener('click', e => {
   const nav = e.target.closest('[data-gal]');
   if(nav){
     const pista = document.getElementById('galPista');
+    zoomReiniciar();
     pista.scrollBy({left: pista.clientWidth * Number(nav.dataset.gal), behavior:'smooth'});
     return;
   }
@@ -1478,7 +1712,10 @@ function detalleEnvioHTML(id, ped){
       campos('Datos para Shalom', '', '<p class="nota-chica">Los datos deben ser de una persona mayor de edad.</p>');
   }
   if(id === 'indrive'){
-    h += '<p class="nota-chica"><b>Dentro de Lima.</b> Enviamos desde San Miguel: es lo más recomendado para distritos cercanos. ' +
+    const dI = buscarDistrito(distritoTxt);
+    h += '<div class="campo"><span>Tu distrito (para cotizar)</span>' + selectDistritoHTML('distritoCarrito', distritoTxt) + '</div>' +
+      (dI && dI.cerca ? cercaHTML('indrive', true) : '') +
+      '<p class="nota-chica"><b>Dentro de Lima.</b> Enviamos desde San Miguel: es lo más recomendado para distritos cercanos. ' +
       'Antes de pagar, mándanos tu ubicación y te cotizamos el envío (si estás lejos puede salir más caro que el delivery). ' +
       'Coordinamos el día y la hora por chat, y te mandamos foto al dejarlo con el conductor y el seguimiento en vivo.</p>' +
       '<p class="nota-chica">Cuando confirmes, yapeas tus productos (' + fmtPrecio(ped.productos) + ') y el envío lo pagas al recibir.</p>' +
@@ -1792,10 +2029,24 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape' && document.body.classList.contains('sin-scroll')) cerrarHoja();
 });
-// Una foto con el enlace roto no deja un hueco: se cambia por la de reserva.
+// Foto que no carga: en la galería y en las tarjetas se reintenta una vez y, si
+// vuelve a fallar, se avisa "No se pudo cargar la foto. Revisa tu conexión." En el
+// resto (sin caja), se cambia por la foto de reserva para no dejar un hueco.
 document.addEventListener('error', e => {
   const img = e.target;
-  if(img && img.tagName === 'IMG' && img.src !== FOTO_VACIA) img.src = FOTO_VACIA;
+  if(!img || img.tagName !== 'IMG' || img.src === FOTO_VACIA) return;
+  const caja = img.parentNode;
+  if(caja && caja.classList && (caja.classList.contains('foto-caja') || caja.classList.contains('prod-foto'))){
+    if(!img.dataset.reintento){
+      img.dataset.reintento = '1';
+      setTimeout(() => { img.src = img.src.split('?')[0] + '?r=' + Date.now(); }, 1500);
+    } else {
+      caja.classList.remove('lenta');
+      caja.classList.add('fallo');
+    }
+    return;
+  }
+  img.src = FOTO_VACIA;
 }, true);
 
 /* ---------- Ofertas con temporizador ---------- */

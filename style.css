@@ -1157,8 +1157,7 @@ details.datos-form .opc{font-weight:500;color:var(--muted);}
 .dm-menu{display:flex;gap:8px;justify-content:center;margin-top:10px;}
 .dm-menu .btn{width:auto;min-height:38px;margin:0;padding:0 16px;font-size:13px;border-radius:10px;}
 
-/* Fotos que todavía cargan: se ve "Cargando…" en vez de un cuadro negro */
-.galeria-pista img,.prod-foto img,.combo-tira img{
+.combo-tira img{
   background:var(--chip) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='40'%3E%3Ctext x='110' y='25' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%238a8680'%3ECargando foto…%3C/text%3E%3C/svg%3E") center no-repeat;
 }
 
@@ -1192,23 +1191,6 @@ details.datos-form .opc{font-weight:500;color:var(--muted);}
 /* Atajo de la sección en la que estás */
 .cats a.activo{background:var(--accent);border-color:var(--accent);color:#fff;}
 
-/* Inicio en PC: la foto completa a la izquierda (corrida un poco hacia afuera, así
-   se ve más de los productos de la derecha) y el degradado empieza donde ella termina. */
-@media (min-width:760px){
-  .hero{
-    padding:34px 28px 28px 50%;
-    min-height:440px;
-    background:linear-gradient(90deg, #1e1440 0%, #1e1440 48%, #110c22 70%, #0b0a12 100%);
-  }
-  .hero-foto{
-    right:auto;bottom:0;
-    left:-9%;
-    width:57%;height:100%;
-    object-position:right center;
-    -webkit-mask-image:linear-gradient(90deg, #000 94%, transparent 100%);
-    mask-image:linear-gradient(90deg, #000 94%, transparent 100%);
-  }
-}
 
 /* "Combo" subrayado en la ficha, y flecha para volver desde el combo */
 .combo-link{color:var(--accent-txt);font-weight:800;text-decoration:underline;text-underline-offset:3px;}
@@ -1282,3 +1264,145 @@ body.hay-promos .solo-promos{display:inline;}
 .ubi{margin-top:12px;}
 .ubi .chip{min-height:40px;font-size:13px;padding:0 12px;}
 .ubi-img{display:block;width:100%;max-width:300px;border-radius:10px;margin-top:6px;}
+
+/* Inicio en PC: la foto a la izquierda; junto a ella el negro y, hacia la
+   derecha, el morado. Una copia borrosa de la foto hace que se funda con el
+   oscuro (sin el corte brusco de "media foto"). En celular no se usa la copia. */
+.hero-foto-fondo{display:none;}
+@media (min-width:760px){
+  .hero{
+    padding:34px 28px 28px 50%;
+    min-height:440px;
+    background:linear-gradient(90deg, #0b0a12 0%, #0b0a12 48%, #120c24 66%, #1d1440 84%, #2a1b5a 100%);
+  }
+  .hero-foto-fondo{
+    display:block;
+    position:absolute;
+    top:-6%;bottom:-6%;
+    left:-9%;
+    width:72%;height:112%;
+    object-fit:cover;
+    object-position:right center;
+    filter:blur(26px) brightness(.5) saturate(1.15);
+    z-index:-2;
+    -webkit-mask-image:linear-gradient(90deg, #000 50%, transparent 100%);
+    mask-image:linear-gradient(90deg, #000 50%, transparent 100%);
+  }
+  .hero-foto{
+    right:auto;bottom:0;
+    left:-9%;
+    width:57%;height:100%;
+    object-position:right center;
+    -webkit-mask-image:linear-gradient(90deg, #000 62%, transparent 100%);
+    mask-image:linear-gradient(90deg, #000 62%, transparent 100%);
+  }
+}
+
+/* ---------- Galería de la ficha: cada foto o video en su caja ---------- */
+.galeria-pista > .foto-caja,.galeria-pista > .vid-caja{
+  flex:0 0 100%;
+  width:100%;
+  aspect-ratio:1/1;
+  scroll-snap-align:center;
+  position:relative;
+  overflow:hidden;
+  background:var(--chip);
+}
+/* La foto aparece recién cuando cargó completa (antes se veía a medias). */
+.foto-caja img{
+  width:100%;height:100%;
+  object-fit:cover;
+  display:block;
+  transform-origin:center center;
+  /* Deja deslizar la galería y bajar la ficha, pero el pellizco lo maneja la página (zoom propio). */
+  touch-action:pan-x pan-y;
+  -webkit-user-select:none;user-select:none;
+  -webkit-user-drag:none;
+  opacity:0;
+  transition:opacity .25s ease;
+}
+.foto-caja.cargada img{opacity:1;}
+.prod-foto img{opacity:0;transition:opacity .25s ease;}
+.prod-foto.cargada img{opacity:1;}
+/* Mensaje mientras carga, si tarda o si falla */
+.foto-caja::after,.prod-foto::after{
+  content:"Cargando foto…";
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  padding:0 18px;
+  text-align:center;
+  font-size:13px;
+  color:var(--muted);
+  pointer-events:none;
+}
+.foto-caja.cargada::after,.prod-foto.cargada::after{content:none;}
+.foto-caja.lenta::after{content:"Tu conexión está lenta: la foto está cargando…";}
+.foto-caja.fallo::after,.prod-foto.fallo::after{content:"No se pudo cargar la foto. Revisa tu conexión.";}
+/* Zoom activo: la foto ya no deja deslizar la galería; se mueve con el dedo. */
+.foto-caja.con-zoom img{touch-action:none;cursor:grab;transition:none;}
+.galeria-pista.zoom-activo{overflow-x:hidden;}
+.zoom-btn{
+  position:absolute;
+  left:10px;top:10px;
+  z-index:3;
+  width:40px;height:40px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.35);
+  background:rgba(0,0,0,.55);
+  color:#fff;
+  font-size:22px;font-weight:800;line-height:1;
+  cursor:pointer;
+}
+.zoom-btn[hidden]{display:none;}
+
+/* Videos de la ficha: fondo borroso del mismo video en vez de franjas negras */
+.vid-caja{background-size:cover;background-position:center;}
+.vid-caja::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.2);}
+.galeria-pista .vid-caja video{
+  position:relative;
+  width:100%;height:100%;
+  aspect-ratio:auto;
+  object-fit:contain;
+  background:transparent;
+  display:block;
+}
+
+/* Combos: los videos verticales a su propio tamaño, sin franjas negras */
+.combo-tira img{height:280px;width:auto;aspect-ratio:3/4;flex:0 0 auto;max-width:none;}
+.combo-tira video{flex:0 0 auto;height:280px;width:auto;max-width:100%;aspect-ratio:auto;object-fit:contain;background:transparent;}
+
+/* ---------- Filtro por categoría: En stock / Agotados ---------- */
+.filtro-stock{display:flex;gap:8px;margin:-4px 0 12px;}
+.filtro{
+  display:inline-flex;align-items:center;gap:6px;
+  min-height:32px;padding:0 12px;
+  border-radius:999px;
+  font-size:12px;font-weight:800;
+  border:1px solid var(--line);
+  background:transparent;
+  color:var(--muted);
+  font-family:inherit;
+}
+.filtro::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;}
+.filtro-stock-on{color:#22c55e;border-color:#22c55e;background:rgba(34,197,94,.1);}
+.filtro-agot-on{color:#ef4444;border-color:#ef4444;background:rgba(239,68,68,.1);cursor:pointer;}
+.filtro-agot-off{cursor:pointer;}
+.filtro-agot-off::before{background:transparent;border:1px solid currentColor;}
+
+/* "Últimas unidades" en rojo (urgencia) */
+.tag-pocos{background:#ef4444;color:#fff;border:0;}
+.pocos{color:#ef4444;}
+
+/* Botones rectangulares: se "hunden" un poco al presionarlos */
+.btn,.hero-promo,.cant-ficha button,.escribenos-menu .btn,.dm-menu .btn{
+  transition:transform .12s ease, filter .12s ease, background-color .2s ease;
+}
+.btn:active,.hero-promo:active,.cant-ficha button:active{transform:scale(.96);filter:brightness(.92);}
+
+/* Animación al bajar: las tarjetas aparecen al llegar a ellas */
+.aparece{opacity:0;transform:translateY(18px);transition:opacity .45s ease, transform .45s ease;}
+.aparece.visible{opacity:1;transform:none;}
+@media (prefers-reduced-motion: reduce){ .aparece{opacity:1;transform:none;transition:none;} }
+
+/* Sin zoom por doble toque en toda la página (el zoom solo vive en las fotos de la ficha) */
+html{touch-action:manipulation;}

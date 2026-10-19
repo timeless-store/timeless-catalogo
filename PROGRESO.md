@@ -170,3 +170,18 @@
 - **Día de entrega**: botones por día (mañana a 7 días, sin domingos); nada viene marcado y se puede quitar tocándolo de nuevo. **Pago del producto** (Yape/efectivo): sin marcar y se puede quitar.
 - **Ubicación** (delivery e InDrive): por defecto "te la mando por WhatsApp"; o pegar un link de Google Maps.
 - Al enviar el pedido se pregunta "¿Ya lo enviaste?" y ofrece vaciar el carrito (no se vacía solo, por si el cliente no llegó a enviarlo).
+
+## 16. Pulido final (19 de octubre)
+
+- Inicio en PC: negro junto a la foto y morado al final; una copia borrosa de la foto la funde con el oscuro.
+- Delivery/InDrive en San Miguel, Magdalena, Pueblo Libre o Callao: sugiere recojo sin costo o InDrive (marcados con `cerca: true` en `config.js`). InDrive también pide el distrito.
+- Al volver del Libro de Reclamaciones, el catálogo vuelve al mismo lugar.
+- Los atajos dejan ver el título de la sección (la cabecera ya no lo tapa). "Ver catálogo" baja a Más vendidos.
+- Fotos: "Cargando foto…" hasta que están completas; "conexión lenta" a los 5 s; si fallan, un reintento y luego el aviso.
+- Zoom: la página no hace zoom (ni doble toque ni pellizco); solo las fotos de la ficha: pellizco hasta 5x o botón + (2x), y se mueven con el dedo.
+- Videos de la ficha: se reproducen solos al llegar, se pausan al tocarlos (aparece la barra de tiempo) y tienen fondo borroso (archivo `-fondo.jpg` que crea el script de fotos).
+- Filtro por categoría: "En stock" (verde) y "Agotados" (rojo, se apaga → "Ver agotados").
+- "¿No sabes si te queda?" solo en cinturones y anillos. Se quitó "Te ayudamos a elegir tu talla".
+- Combos: videos verticales a su propio tamaño, sin franjas negras.
+- "Últimas unidades" en rojo. Botones con efecto al presionar. Las tarjetas aparecen al bajar.
+- Preguntas frecuentes: fallas dentro de 48 h (obligatorio) y daños por mal uso no aplican; InDrive también puede salir con envío gratis (se cotiza).
