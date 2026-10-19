@@ -647,6 +647,20 @@ function fechaCortaLima(ms){
 function combosActivos(ahora){
   return PROMOS.map((pr, i) => ({pr: pr, i: i})).filter(x => x.pr.tipo === 'combo' && promoActiva(x.pr, ahora));
 }
+// REGLA de Alberto: cuando una promo termina, la cuenta se queda en 00:00:00 unos
+// minutos (ya sin precio de promo: "Promo terminada") y recién después desaparece
+// TODO lo de promos: la sección, el botón "🔥 Promos disponibles" del inicio y el
+// atajo "🔥 Promos" del menú.
+const PROMO_GRACIA_MS = (cfg.PROMO_GRACIA_MIN == null ? 5 : cfg.PROMO_GRACIA_MIN) * 60 * 1000;
+function promoVisible(pr, ahora){
+  if(!pr.activa) return false;
+  if(pr.hasta === null) return true;
+  if(isNaN(pr.hasta)) return false;
+  return ahora < pr.hasta + PROMO_GRACIA_MS;
+}
+function combosVisibles(ahora){
+  return PROMOS.map((pr, i) => ({pr: pr, i: i})).filter(x => x.pr.tipo === 'combo' && promoVisible(x.pr, ahora));
+}
 // Productos que entran en un casillero, en el orden en que están escritos.
 function opcionesCasillero(token){
   const out = [];
@@ -694,6 +708,15 @@ function estadoCombo(x, ahora){
 function comboHTML(x, ahora){
   const st = estadoCombo(x, ahora);
   const foto = x.pr.foto || fotoPropia((st.casilleros[0] || [])[0]);
+  // Ya pasó la hora de fin (los minutos en 00:00:00 antes de que desaparezca).
+  if(!promoActiva(x.pr, ahora)){
+    return '<div class="combo combo-agotado">' +
+      '<div class="combo-foto"><img loading="lazy" src="' + esc(foto) + '" alt="' + esc(x.pr.nombre) + '">' +
+        '<div class="tags"><span class="tag tag-agotado">Terminó</span></div></div>' +
+      '<div class="combo-cuerpo"><div class="combo-nombre">' + esc(x.pr.nombre) + '</div>' +
+        '<div class="cuenta cuenta-urgente">Termina en <b class="mono">' + fmtCuenta(0) + '</b></div>' +
+        '<span class="btn" aria-disabled="true">Promo terminada</span></div></div>';
+  }
   return '<a class="combo' + (st.disponible ? '' : ' combo-agotado') + '" href="#/combo/' + x.i + '">' +
     '<div class="combo-foto"><img loading="lazy" src="' + esc(foto) + '" alt="' + esc(x.pr.nombre) + '">' +
       (st.disponible ? '' : '<div class="tags"><span class="tag tag-agotado">Agotado</span></div>') + '</div>' +
@@ -790,7 +813,7 @@ document.getElementById('comboBody').addEventListener('click', e => {
   }
 });
 function promosSeccionHTML(ahora){
-  const combos = combosActivos(ahora);
+  const combos = combosVisibles(ahora);
   if(!combos.length) return '';
   return '<section class="cat" id="promos"><h2 class="cat-titulo">Promociones</h2>' +
     '<p class="sub-desc">Toca un combo, elige tus productos (con sus fotos y videos) y agrégalo: el precio de la promo se aplica solo en tu carrito.</p>' +
@@ -802,9 +825,15 @@ function promosSeccionHTML(ahora){
 function renderHeroPromo(ahora){
   const el = document.getElementById('heroPromo');
   if(!el) return;
-  const combos = combosActivos(ahora);
+  const combos = combosVisibles(ahora);
   if(!combos.length){ el.innerHTML = ''; return; }
   const fines = combos.map(x => x.pr.hasta).filter(h => h && !isNaN(h));
+  // Los minutos en 00:00:00: ya no quedan promos vigentes.
+  if(!combosActivos(ahora).length){
+    el.innerHTML = '<a class="hero-promo" href="#promos" data-scroll="promos"><span class="hero-promo-titulo">🔥 Promos terminadas</span>' +
+      '<span class="hero-promo-sub">Terminaron el ' + fechaCortaLima(Math.min.apply(null, fines)) + ' · Atento a las próximas</span></a>';
+    return;
+  }
   el.innerHTML = '<a class="hero-promo" href="#promos" data-scroll="promos"><span class="hero-promo-titulo">🔥 Promos disponibles</span>' +
     '<span class="hero-promo-sub">' + (fines.length ? 'Hasta el ' + fechaCortaLima(Math.min.apply(null, fines)) + ' · ' : '') + 'Ver promos →</span></a>';
 }
@@ -815,7 +844,7 @@ function renderGrilla(){
   const nav = document.getElementById('catsNav');
   const grupos = agrupar();
   renderHeroPromo(ahora);
-  document.body.classList.toggle('hay-promos', combosActivos(ahora).length > 0);
+  document.body.classList.toggle('hay-promos', combosVisibles(ahora).length > 0);
   if(!grupos.length){
     nav.innerHTML = '';
     main.innerHTML = '<div class="estado">Todavía no hay productos en el catálogo.</div>';
@@ -2102,7 +2131,7 @@ document.addEventListener('error', e => {
 let firmaOfertas = '';
 function calcFirma(ahora){
   return PRODUCTOS.map(p => ofertaActiva(p, ahora) ? '1' : '0').join('') + '|' +
-         PROMOS.map(pr => promoActiva(pr, ahora) ? '1' : '0').join('');
+         PROMOS.map(pr => (promoActiva(pr, ahora) ? '1' : '0') + (promoVisible(pr, ahora) ? '1' : '0')).join('');
 }
 setInterval(() => {
   renderFranja();

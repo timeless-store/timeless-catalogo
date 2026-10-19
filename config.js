@@ -133,6 +133,10 @@ const CATALOGO_CONFIG = {
   // 'primero' (arriba de Más vendidos) o 'despues-de-mas-vendidos'.
   PROMOS_POSICION: 'primero',
 
+  // Minutos que la cuenta de una promo se queda en 00:00:00 ("Promo terminada")
+  // antes de que desaparezca todo lo de promos.
+  PROMO_GRACIA_MIN: 5,
+
   // Líneas dentro de una categoría (columna "Linea" de la hoja). Se muestran como
   // etiqueta en la tarjeta (con esta descripción al pasar el cursor) y en la ficha.
   LINEAS: [
