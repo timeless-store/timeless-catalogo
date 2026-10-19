@@ -1419,3 +1419,8 @@ html{touch-action:manipulation;}
 /* Con una ventana abierta (ficha, carrito, combo) la página de atrás queda fija. */
 html.sin-scroll{overflow:hidden;}
 .overlay{overscroll-behavior:contain;}
+
+/* Escríbenos: el menú crece hacia la izquierda si los dos botones no entran
+   (en Android de ~412px Instagram se salía del recuadro). */
+.escribenos-menu{left:auto;right:0;width:max-content;min-width:100%;max-width:calc(100vw - 32px);}
+.escribenos-menu .btn{white-space:nowrap;}
