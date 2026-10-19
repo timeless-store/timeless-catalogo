@@ -195,8 +195,9 @@ function aplicarEstado(productos, filas){
   const mapa = {};
   filas.slice(1).forEach(r => {
     const n = norm(celda(r, 'producto'));
+    // "Quedan": 1, 2 o 3 SOLO cuando el stock real es ese; vacío = no mostrar cantidad.
     if(n) mapa[n] = {estado: norm(celda(r, 'estado')), puesto: parseInt(celda(r, 'bestseller'), 10) || 0,
-                      orden: parseInt(celda(r, 'orden'), 10) || 0};
+                      orden: parseInt(celda(r, 'orden'), 10) || 0, quedan: parseInt(celda(r, 'quedan'), 10) || 0};
   });
   productos.forEach(p => {
     const nombres = p.inventario.length ? p.inventario : [p.nombre];
@@ -210,6 +211,9 @@ function aplicarEstado(productos, filas){
     if(!(p.proximamente && p.visibleSi)){
       p.disponible = est === 'en stock' || est === 'quedan pocos';
       p.pocos = est === 'quedan pocos';
+      // Unidades que quedan (1 a 3). Si junta varias filas, la menor de las que traen número.
+      const qs = suyas.map(f => f.quedan).filter(n => n >= 1 && n <= 3);
+      p.quedan = p.disponible && qs.length ? Math.min.apply(null, qs) : 0;
       p.restock = est === 'restock en camino';
       p.proximamente = false;
       p.visible = p.visible && (est !== 'oculto' || p.visibleSi);
@@ -286,6 +290,9 @@ function resumirEstado(e, v){
   e.proximamente = !e.disponible && v.some(p => p.proximamente);
   e.restock = !e.disponible && !e.proximamente && v.some(p => p.restock);
   e.pocos = e.disponible && v.filter(p => p.disponible).every(p => p.pocos);
+  // Cuántas quedan: solo cuando hay UNA variante disponible (el número es de ese producto).
+  const dispo = v.filter(p => p.disponible);
+  e.quedan = dispo.length === 1 && dispo[0].quedan ? dispo[0].quedan : 0;
   e.nuevo = v.some(p => p.nuevo);
   const puestos = v.map(p => p.bestSeller).filter(n => n > 0);
   e.bestSeller = puestos.length ? Math.min.apply(null, puestos) : 0;
@@ -506,6 +513,7 @@ function usarFilas(rows){
   POR_ID = {};
   PRODUCTOS.forEach(p => { POR_ID[p.id] = p; });
   construirEntradas();
+  ajustarCarritoAStock();
   firmaOfertas = calcFirma(Date.now());
   renderTodo();
   quitarCarga();
@@ -613,7 +621,7 @@ function tarjetaHTML(e, ahora){
   else {
     if(e.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
     if(oferta) tags += '<span class="tag tag-oferta">Oferta</span>';
-    if(e.pocos) tags += '<span class="tag tag-pocos">Últimas unidades</span>';
+    if(e.pocos) tags += '<span class="tag tag-pocos">' + (e.quedan ? textoQuedan(e.quedan, false) : 'Últimas unidades') + '</span>';
   }
   const apagado = !e.disponible && !e.proximamente;
   // Un grupo en una sola tarjeta lista sus colores; una tarjeta de un color avisa que hay otros.
@@ -805,6 +813,13 @@ document.getElementById('comboBody').addEventListener('click', e => {
   const add = e.target.closest('[data-combo-agregar]');
   if(add){
     const ids = comboSel[Number(add.dataset.comboAgregar)] || [];
+    // Que no pase de lo que queda (ej.: queda 1 y ya lo tiene en el carrito).
+    const pedidos = {}; ids.forEach(id => { pedidos[id] = (pedidos[id] || 0) + 1; });
+    const sinStock = Object.keys(pedidos).find(id => (carrito[id] || 0) + pedidos[id] > maxDe(id));
+    if(ids.length && sinStock && ids.every(id => sePuedePedir(POR_ID[id]))){
+      toast('De ' + POR_ID[sinStock].nombre + ' ' + (maxDe(sinStock) === 1 ? 'solo queda 1' : 'solo quedan ' + maxDe(sinStock)) + ': ya lo tienes en tu carrito');
+      return;
+    }
     if(ids.length && ids.every(id => sePuedePedir(POR_ID[id]))){
       ids.forEach(id => agregar(id));
       toast('Combo agregado: el precio de la promo ya está en tu carrito');
@@ -1314,16 +1329,38 @@ function guardarEnvio(){
   try{ localStorage.setItem(ENVIO_KEY, envioSel); }catch(e){}
 }
 function sePuedePedir(p){ return !!p && p.disponible; }
+// Textos de "cuántas quedan" (solo cuando el dashboard avisa 1, 2 o 3).
+function textoQuedan(n, conAdmiracion){
+  const t = n === 1 ? 'Queda 1' : 'Quedan ' + n;
+  return conAdmiracion ? '¡' + t + '!' : t;
+}
+// Lo máximo que se puede llevar de un producto: 10, o lo que queda si quedan 3 o menos.
+function maxDe(id){
+  const p = POR_ID[id];
+  return p && p.quedan ? Math.min(CANT_MAX, p.quedan) : CANT_MAX;
+}
 function setCantidad(id, n){
-  n = Math.max(0, Math.min(CANT_MAX, n));
+  const tope = maxDe(id);
+  if(n > tope && POR_ID[id] && POR_ID[id].quedan) toast(tope === 1 ? 'Solo queda 1 de este producto' : 'Solo quedan ' + tope + ' de este producto');
+  n = Math.max(0, Math.min(tope, n));
   if(n === 0) delete carrito[id]; else carrito[id] = n;
   guardarCarrito();
   renderContador();
+}
+// Si el stock bajó mientras el carrito estaba guardado, se baja a lo que queda.
+function ajustarCarritoAStock(){
+  let cambio = false;
+  Object.keys(carrito).forEach(id => {
+    const tope = maxDe(id);
+    if(POR_ID[id] && carrito[id] > tope){ carrito[id] = tope; cambio = true; }
+  });
+  if(cambio){ guardarCarrito(); renderContador(); }
 }
 function agregar(id){
   // Doble candado: el botón ya sale deshabilitado, pero un agotado tampoco
   // entra al carrito por ningún otro camino.
   if(!sePuedePedir(POR_ID[id])) return false;
+  if((carrito[id] || 0) >= maxDe(id)){ setCantidad(id, (carrito[id] || 0) + 1); return false; }
   setCantidad(id, (carrito[id] || 0) + 1);
   contar('carrito/' + id, 'Agregó al carrito: ' + POR_ID[id].nombre);
   return true;
@@ -1477,7 +1514,7 @@ function renderFicha(indice){
       '<div class="ficha-precios">' + preciosHTML(p, ahora) + '</div>' +
       // Restock en camino: botón amarillo que baja al "Avísame".
       (p.restock ? '<button type="button" class="btn btn-restock" data-ir-aviso>Restock en camino · Te avisamos apenas llegue</button>' : '') +
-      (p.disponible && p.pocos ? '<div class="pocos">Últimas unidades</div>' : '') +
+      (p.disponible && p.pocos ? '<div class="pocos">' + (p.quedan ? textoQuedan(p.quedan, true) : 'Últimas unidades') + '</div>' : '') +
       (p.disponible ? cuentaHTML(p, ahora, 'ficha-cuenta') : '') +
       (p.envioGratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Envío gratis llevando este producto</div>' : '') +
       // La palabra "Combo" es un enlace a la hoja del combo (con flecha para volver aquí).
@@ -1507,7 +1544,7 @@ function renderFicha(indice){
         ? (enCarrito
           ? '<div class="cant-ficha"><button type="button" data-ficha-cant="-1" aria-label="Quitar uno">−</button>' +
             '<span><b>' + enCarrito + '</b> en tu carrito</span>' +
-            '<button type="button" data-ficha-cant="1" aria-label="Agregar uno"' + (enCarrito >= CANT_MAX ? ' disabled' : '') + '>+</button></div>' +
+            '<button type="button" data-ficha-cant="1" aria-label="Agregar uno"' + (enCarrito >= maxDe(p.id) ? ' disabled' : '') + '>+</button></div>' +
             '<div class="en-carrito">' + (enCarrito > 1 ? 'Más de 1 unidad: sujeto a disponibilidad. ' : '') + '<a href="#/carrito">Ver carrito</a></div>'
           : '<button type="button" class="btn btn-primario" data-agregar="' + esc(p.id) + '">Agregar al carrito</button>')
         : '<div id="avisoFicha">' + avisoHTML(p) + '</div>') +
@@ -1873,7 +1910,8 @@ function renderCarrito(){
       '<div class="linea-der"><div class="linea-total">' + fmtPrecio(unit * cant) + '</div>' +
       '<div class="cant"><button type="button" data-cant="-1" data-id="' + esc(id) + '" aria-label="Quitar uno">−</button>' +
       '<span>' + cant + '</span>' +
-      '<button type="button" data-cant="1" data-id="' + esc(id) + '" aria-label="Agregar uno">+</button></div></div></div>';
+      '<button type="button" data-cant="1" data-id="' + esc(id) + '" aria-label="Agregar uno"' + (cant >= maxDe(id) ? ' disabled' : '') + '>+</button></div>' +
+      (p.quedan ? '<div class="linea-quedan">' + textoQuedan(p.quedan, true) + '</div>' : '') + '</div></div>';
   }).join('');
 
   // Promos aplicadas (solo si hay).

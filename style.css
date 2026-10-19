@@ -1424,3 +1424,7 @@ html.sin-scroll{overflow:hidden;}
    (en Android de ~412px Instagram se salía del recuadro). */
 .escribenos-menu{left:auto;right:0;width:max-content;min-width:100%;max-width:calc(100vw - 32px);}
 .escribenos-menu .btn{white-space:nowrap;}
+
+/* "¡Quedan 2!" en el carrito */
+.linea-quedan{margin-top:4px;font-size:12px;font-weight:800;color:#ef4444;text-align:right;}
+.cant button:disabled,.cant-ficha button:disabled{opacity:.35;cursor:not-allowed;}
