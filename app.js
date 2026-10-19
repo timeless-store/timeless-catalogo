@@ -433,7 +433,8 @@ function aplicarPromos(lineas, ahora){
 }
 // Textos de promo que se muestran en la ficha de un producto.
 function promosDe(p, ahora){
-  return PROMOS.filter(pr => pr.texto && promoActiva(pr, ahora) && enAlcance(pr, p)).map(pr => pr.texto);
+  return PROMOS.map((pr, i) => ({pr: pr, i: i})).filter(x => x.pr.texto && promoActiva(x.pr, ahora) && enAlcance(x.pr, p))
+    .map(x => ({texto: x.pr.texto, i: x.i, combo: x.pr.tipo === 'combo'}));
 }
 
 /* ---------- Estadísticas (GoatCounter) ----------
@@ -710,6 +711,7 @@ function renderCombo(){
   const st = estadoCombo(x, ahora);
   const falta = st.casilleros.map((ops, s) => st.sel[s] ? '' : (ELIGE[norm(ops[0] ? ops[0].categoria : '')] || 'Elige uno').replace(/^Elige tu /, 'tu ')).filter(Boolean);
   body.innerHTML =
+    (comboDesdeFicha ? '<button type="button" class="sheet-volver" data-volver aria-label="Volver">← ' + esc(ultimaFichaNombre) + '</button>' : '') +
     (x.pr.foto ? '<div class="galeria"><img class="combo-portada" src="' + esc(x.pr.foto) + '" alt="' + esc(x.pr.nombre) + '"></div>' : '') +
     '<div class="sheet-pad">' +
       '<div class="eyebrow">Promoción</div>' +
@@ -742,6 +744,8 @@ function renderCombo(){
     '</div>';
 }
 document.getElementById('comboBody').addEventListener('click', e => {
+  // Flecha: vuelve a la ficha desde la que se abrió el combo.
+  if(e.target.closest('[data-volver]')){ history.back(); return; }
   // Combo agotado: vuelve a la sección de promos para elegir otro.
   if(e.target.closest('[data-otros-combos]')){
     cerrarHoja();
@@ -793,6 +797,7 @@ function renderGrilla(){
   const nav = document.getElementById('catsNav');
   const grupos = agrupar();
   renderHeroPromo(ahora);
+  document.body.classList.toggle('hay-promos', combosActivos(ahora).length > 0);
   if(!grupos.length){
     nav.innerHTML = '';
     main.innerHTML = '<div class="estado">Todavía no hay productos en el catálogo.</div>';
@@ -914,8 +919,9 @@ const DISTRITO_KEY = 'timeless_catalogo_distrito';
 let distritoTxt = '';
 try{ distritoTxt = localStorage.getItem(DISTRITO_KEY) || ''; }catch(e){ distritoTxt = ''; }
 let puntoRecojo = 0;          // índice en PUNTOS_RECOJO
-let fechaEntrega = '';        // "2026-10-25" (solo delivery)
-let pagoProducto = 'Yape';    // delivery: cómo paga el producto al recibir
+let fechaEntrega = '';        // "2026-10-25" (solo delivery); vacío = sin elegir
+let pagoProducto = '';        // delivery: cómo paga el producto al recibir (vacío = sin elegir)
+let ubicacionModo = 'whatsapp'; // 'whatsapp' (por defecto) o 'maps' (pega un link)
 // Datos del cliente para el envío (nombre, DNI…). Solo viven mientras la página
 // está abierta: NO se guardan en el celular ni en ningún otro lado; viajan
 // únicamente dentro del mensaje que el cliente manda por chat.
@@ -946,16 +952,90 @@ const costoShalom = () => cfg.SHALOM_COSTO || 8;
 // Desde cuánto conviene recomendar Shalom en vez del delivery.
 const RECOMENDAR_SHALOM_DESDE = 15;
 
-// Lista desplegable con TODOS los distritos (en orden alfabético) + "otro".
+// Distrito: se puede ESCRIBIR (salen sugerencias: "San" → San Miguel, San Martín de
+// Porres…) o abrir la flechita ▾ para ver todos. Un segundo toque a la flechita la cierra.
 function selectDistritoHTML(id, valor){
-  const lista = (cfg.DISTRITOS || []).slice().sort((a, b) => a.n.localeCompare(b.n, 'es'));
-  const elegido = buscarDistrito(valor);
-  return '<select id="' + id + '" data-distrito>' +
-    '<option value="">Elige tu distrito</option>' +
-    lista.map(d => '<option value="' + esc(d.n) + '"' + (elegido === d ? ' selected' : '') + '>' + esc(d.n) + '</option>').join('') +
-    '<option value="__otro"' + (valor === '__otro' ? ' selected' : '') + '>Otro / no aparece mi distrito</option>' +
-    '</select>';
+  const d = buscarDistrito(valor);
+  const texto = d ? d.n : (valor && valor !== '__otro' ? valor : '');
+  return '<div class="cd" data-cd="' + id + '">' +
+    '<input type="text" class="cd-input" id="' + id + '" value="' + esc(texto) + '" placeholder="Escribe o elige tu distrito" autocomplete="off" autocapitalize="words" role="combobox" aria-expanded="false">' +
+    '<button type="button" class="cd-flecha" aria-label="Ver todos los distritos" tabindex="-1">▾</button>' +
+    '<ul class="cd-lista" role="listbox" hidden></ul></div>';
 }
+function opcionesDistrito(txt){
+  const lista = (cfg.DISTRITOS || []).slice().sort((a, b) => a.n.localeCompare(b.n, 'es'));
+  const t = norm(txt);
+  if(!t) return lista;
+  const empieza = [], contiene = [];
+  lista.forEach(d => {
+    const nombres = [d.n].concat(d.alias || []).map(norm);
+    if(nombres.some(n => n.indexOf(t) === 0 || n.split(' ').some(pal => pal.indexOf(t) === 0))) empieza.push(d);
+    else if(nombres.some(n => n.indexOf(t) > -1)) contiene.push(d);
+  });
+  return empieza.concat(contiene);
+}
+function pintarListaDistrito(cd, todos){
+  const inp = cd.querySelector('.cd-input'), ul = cd.querySelector('.cd-lista');
+  const ops = opcionesDistrito(todos ? '' : inp.value);
+  ul.innerHTML = ops.length
+    ? ops.map(d => '<li role="option" class="cd-opcion" data-valor="' + esc(d.n) + '">' + esc(d.n) + '</li>').join('')
+    : '<li class="cd-nada">No aparece ese distrito. Escríbenos y revisamos si llegamos.</li>';
+  ul.hidden = false;
+  inp.setAttribute('aria-expanded', 'true');
+}
+function cerrarListaDistrito(cd){
+  cd.querySelector('.cd-lista').hidden = true;
+  cd.querySelector('.cd-input').setAttribute('aria-expanded', 'false');
+}
+// Guarda el distrito elegido y actualiza el costo (en el carrito o en la sección de envíos).
+function aplicarDistrito(cd, valor){
+  distritoTxt = valor;
+  guardarDistrito();
+  cerrarListaDistrito(cd);
+  if(cd.dataset.cd === 'distritoHome'){
+    const c = document.getElementById('cotizHome');
+    if(c) c.innerHTML = cotizacionHTML(distritoTxt, false, false);
+  } else repintarCarrito();
+}
+document.addEventListener('input', e => {
+  const inp = e.target.closest('.cd-input');
+  if(inp) pintarListaDistrito(inp.closest('.cd'), false);
+});
+document.addEventListener('focusin', e => {
+  const inp = e.target.closest('.cd-input');
+  if(inp && inp.value) { inp.select(); }
+});
+// pointerdown (y no click) para ganarle al cierre del teclado al soltar el dedo.
+document.addEventListener('pointerdown', e => {
+  const op = e.target.closest('.cd-opcion');
+  if(op){ e.preventDefault(); aplicarDistrito(op.closest('.cd'), op.dataset.valor); return; }
+  const fl = e.target.closest('.cd-flecha');
+  if(fl){
+    e.preventDefault();
+    const cd = fl.closest('.cd'), ul = cd.querySelector('.cd-lista');
+    if(ul.hidden) pintarListaDistrito(cd, true); else cerrarListaDistrito(cd);
+    return;
+  }
+  // Tocar afuera cierra las listas abiertas.
+  document.querySelectorAll('.cd-lista:not([hidden])').forEach(ul => { if(!ul.closest('.cd').contains(e.target)) cerrarListaDistrito(ul.closest('.cd')); });
+});
+// Al salir del campo (o Enter): si lo escrito es un distrito, se aplica; si está vacío, se borra.
+document.addEventListener('change', e => {
+  const inp = e.target.closest('.cd-input');
+  if(!inp) return;
+  const cd = inp.closest('.cd'), d = buscarDistrito(inp.value);
+  aplicarDistrito(cd, d ? d.n : inp.value.trim());
+});
+document.addEventListener('keydown', e => {
+  const inp = e.target.closest && e.target.closest('.cd-input');
+  if(!inp) return;
+  const cd = inp.closest('.cd');
+  if(e.key === 'Escape'){ cerrarListaDistrito(cd); return; }
+  if(e.key === 'Enter'){
+    const primera = cd.querySelector('.cd-opcion');
+    if(!cd.querySelector('.cd-lista').hidden && primera && !buscarDistrito(inp.value)){ e.preventDefault(); aplicarDistrito(cd, primera.dataset.valor); }
+  }
+});
 
 // Recuadro con el costo aproximado del delivery a un distrito. Se usa en la
 // sección "Envíos y pagos" y en el carrito (ahí con el botón "Cambiar a Shalom").
@@ -1007,6 +1087,18 @@ function envioEstimado(id, gratis){
 
 /* ---------- Fecha de entrega del delivery (lun–sáb, máx. 1 semana) ---------- */
 function fechaISO(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+// Días que se pueden elegir para el delivery: de mañana a 7 días, sin domingos. No se
+// marca ninguno solo (el cliente toca el que quiera y puede tocarlo de nuevo para quitarlo).
+const DIAS_TXT = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+function fechasEntrega(){
+  const out = [];
+  for(let k = 1; k <= 7; k++){
+    const d = new Date(); d.setDate(d.getDate() + k);
+    if(d.getDay() === 0) continue;
+    out.push({iso: fechaISO(d), txt: (k === 1 ? 'Mañana ' : '') + DIAS_TXT[d.getDay()] + ' ' + d.getDate()});
+  }
+  return out;
+}
 function limitesFecha(){
   const a = new Date(), b = new Date();
   a.setDate(a.getDate() + 1);
@@ -1138,12 +1230,15 @@ function textoPedido(){
     t += '\nEnvío: ' + ped.envio.nombre + lugar + ' (' + (ped.gratis && ped.est.texto !== 'Gratis' ? 'envío gratis · ' : '') + ped.est.texto + ')';
     if(ped.costoEnvio > 0) t += '\nTotal aprox.: ' + fmtPrecio(ped.productos + ped.costoEnvio);
     if(id === 'moto'){
-      if(fechaEntrega && !avisoFecha(fechaEntrega)) t += '\nDía de entrega: ' + fechaBonita(fechaEntrega);
-      t += '\nEl producto lo pago al recibir con: ' + pagoProducto;
+      if(fechaEntrega) t += '\nDía de entrega: ' + fechaBonita(fechaEntrega);
+      if(pagoProducto) t += '\nEl producto lo pago al recibir con: ' + pagoProducto;
     }
-    if(id === 'indrive') t += '\nTe mando mi ubicación para que me cotices el envío.';
+    if(id === 'indrive') t += '\nQuiero que me cotices el envío por InDrive.';
     if(id === 'shalom') t +='\nYapeo ' + fmtPrecio(ped.productos) + ' (productos) al ' + (y.numero || '') + ' y te envío la captura.';
-    const campos = (CAMPOS_DATOS[id] || []).filter(c => String(datos[c[0]] || '').trim());
+    // La ubicación va por WhatsApp (por defecto) o como link de Google Maps.
+    const conMapa = (id === 'moto' || id === 'indrive');
+    const campos = (CAMPOS_DATOS[id] || []).filter(c => !(c[0] === 'maps' && ubicacionModo === 'whatsapp') && String(datos[c[0]] || '').trim());
+    if(conMapa && ubicacionModo === 'whatsapp') t += '\nMi ubicación: te la mando por WhatsApp (ubicación actual).';
     if(campos.length) t += '\n\nMis datos:\n' + campos.map(c => c[1].replace(/ \(.*\)$/, '') + ': ' + String(datos[c[0]]).trim()).join('\n');
   }
   return t + '\n\nPedido armado desde el catálogo web.';
@@ -1176,6 +1271,9 @@ function avisoHTML(p){
 let fichaEntradaId = null;   // qué ficha está abierta
 let fichaVarId = null;       // y qué variante (color) tiene elegida
 let avisoLento = false;      // ¿ya se avisó que la conexión está lenta?
+let ultimaFichaNombre = '';   // para el botón "← volver" del combo
+let comboDesdeFicha = false;  // ¿se abrió el combo desde la ficha de un producto?
+let hashActual = location.hash, hashPrevio = '';
 
 // Posición actual de la galería (0 = primera foto), para no perderla al repintar.
 function indiceGaleria(){
@@ -1191,6 +1289,7 @@ function renderFicha(indice){
   const fotos = e.juntos ? e.fotos : (p.fotos.length ? p.fotos : e.fotos);
   const medios = fotos.length ? fotos : [FOTO_VACIA];
   const titulo = e.juntos ? e.nombre : p.nombre;
+  ultimaFichaNombre = titulo;
   const varias = medios.length > 1;
   const dato = (titulo, valor) => valor ? '<div class="dato"><dt>' + titulo + '</dt><dd>' + esc(valor) + '</dd></div>' : '';
   const enCarrito = carrito[p.id] || 0;
@@ -1226,7 +1325,10 @@ function renderFicha(indice){
       (p.disponible && p.pocos ? '<div class="pocos">Últimas unidades</div>' : '') +
       (p.disponible ? cuentaHTML(p, ahora, 'ficha-cuenta') : '') +
       (p.envioGratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Envío gratis llevando este producto</div>' : '') +
-      (promos.length ? '<div class="promo-caja">' + promos.map(t => '<div>🏷 ' + esc(t) + '</div>').join('') + '</div>' : '') +
+      // La palabra "Combo" es un enlace a la hoja del combo (con flecha para volver aquí).
+      (promos.length ? '<div class="promo-caja">' + promos.map(x => '<div>🏷 ' + (x.combo && /^Combo:/i.test(x.texto)
+        ? '<a class="combo-link" href="#/combo/' + x.i + '">Combo</a>:' + esc(x.texto.replace(/^Combo:/i, ''))
+        : esc(x.texto)) + '</div>').join('') + '</div>' : '') +
       '<dl class="datos">' +
         dato('Descripción y medidas', p.descripcion) +
         // En cinturones la talla es la del pantalón (así está en el Canva), con
@@ -1327,15 +1429,24 @@ function detalleEnvioHTML(id, ped){
   const yape = (monto, para) => '<div class="yape"><div class="yape-monto">Yapea ' + monto + '</div>' +
     '<div>al <b class="mono">' + esc(y.numero || '') + '</b> · ' + esc(y.nombre || '') + '</div>' +
     '<div class="nota-chica">' + para + ' Luego envía la captura en el chat junto con tu pedido.</div></div>';
+  // Ubicación: por defecto se manda por WhatsApp (a la gente le resulta más fácil);
+  // o se pega un link de Google Maps.
+  const ubicacionHTML = () => '<div class="ubi"><div class="variantes-titulo">Tu ubicación</div><div class="chips">' +
+    '<button type="button" class="chip' + (ubicacionModo === 'whatsapp' ? ' activo' : '') + '" data-ubi="whatsapp">Te la mando por WhatsApp</button>' +
+    '<button type="button" class="chip' + (ubicacionModo === 'maps' ? ' activo' : '') + '" data-ubi="maps">Pego un link de Google Maps</button></div>' +
+    (ubicacionModo === 'whatsapp'
+      ? '<p class="nota-chica">Lo más fácil: después de enviar tu pedido, mándanos tu <b>ubicación actual</b> por WhatsApp (no "en tiempo real"). Se ve así:</p>' +
+        '<img class="ubi-img" src="img/ubicacion-actual.jpg" alt="Ejemplo de ubicación actual en WhatsApp" loading="lazy">'
+      : '<label class="campo"><span>Link de Google Maps ' + infoHTML('Cómo sacar el link',
+          'En Google Maps busca tu casa → <b>Compartir</b> → <b>Copiar enlace</b>, y pégalo aquí.') + '</span>' +
+        '<input type="url" data-dato="maps" value="' + esc(datos.maps || '') + '" autocomplete="off" placeholder="https://maps.app.goo.gl/…"></label>') +
+    '</div>';
   const campos = (titulo, antes, despues) => '<details class="datos-form" data-datos="' + id + '"' + (datosAbiertos[id] ? ' open' : '') + '>' +
     '<summary>' + titulo + ' <span class="opc">(opcional)</span></summary>' +
     '<p class="nota-chica datos-opc">Si los llenas, llegan junto con tu pedido y es más rápido. Si prefieres, mándanoslos por chat.</p>' +
     (antes || '') +
-    (CAMPOS_DATOS[id] || []).map(c =>
-      '<label class="campo"><span>' + esc(c[1]) + (c[0] === 'maps' ? ' ' + infoHTML('Cómo mandar tu ubicación',
-        '<b>¿No tienes el link?</b> Mándanos por WhatsApp tu <b>ubicación actual</b> (no "en tiempo real"): se ve así 👇' +
-        '<img src="img/ubicacion-actual.jpg" alt="Ejemplo de ubicación actual en WhatsApp" loading="lazy">' +
-        'O en Google Maps busca tu casa → Compartir → Copiar enlace, y pégalo aquí.') : '') + '</span>' +
+    (CAMPOS_DATOS[id] || []).map(c => c[0] === 'maps' ? ubicacionHTML() :
+      '<label class="campo"><span>' + esc(c[1]) + '</span>' +
       '<input type="' + (c[2] || 'text') + '"' + (c[3] ? ' inputmode="' + c[3] + '"' : '') + ' data-dato="' + c[0] + '" value="' + esc(datos[c[0]] || '') + '" autocomplete="off"></label>'
     ).join('') + (despues || '') + '</details>';
   let h = '';
@@ -1346,20 +1457,19 @@ function detalleEnvioHTML(id, ped){
       (((cfg.ENVIOS || []).find(x => x.id === 'recojo') || {}).mapa ? '<a class="mapa-link" target="_blank" rel="noopener" href="' + esc(cfg.ENVIOS.find(x => x.id === 'recojo').mapa.url) + '">' + esc(cfg.ENVIOS.find(x => x.id === 'recojo').mapa.texto) + '</a>' : '');
   }
   if(id === 'moto'){
-    const l = limitesFecha();
-    const aviso = avisoFecha(fechaEntrega);
-    h += '<label class="campo"><span>Tu distrito</span>' + selectDistritoHTML('distritoCarrito', distritoTxt) + '</label>' +
+    h += '<div class="campo"><span>Tu distrito</span>' + selectDistritoHTML('distritoCarrito', distritoTxt) + '</div>' +
       cotizacionHTML(distritoTxt, ped.gratis, true) +
-      '<label class="campo"><span>¿Qué día lo quieres? (lunes a sábado, 11am a 7pm)</span><input type="date" data-fecha min="' + l.min + '" max="' + l.max + '" value="' + esc(fechaEntrega) + '"></label>' +
+      '<div class="campo"><span>¿Qué día lo quieres? (opcional · lunes a sábado, 11am a 7pm)</span><div class="chips dias">' +
+        fechasEntrega().map(f => '<button type="button" class="chip' + (f.iso === fechaEntrega ? ' activo' : '') + '" data-dia="' + f.iso + '">' + f.txt + '</button>').join('') + '</div></div>' +
       '<p class="nota-chica">No hacemos envíos domingos ni feriados.</p>' +
-      (aviso ? '<div class="cotiz cotiz-no">' + esc(aviso) + '</div>' : '');
+      '';
     if(ped.costoEnvio > 0) h += yape(fmtPrecio(ped.costoEnvio) + ' del envío', 'Así tu pedido queda separado (máximo 1 semana).');
     else if(ped.costoEnvio === 0) h += '<p class="nota-chica">Tu envío es gratis: te escribimos para confirmar y separar tu pedido.</p>';
     else if(!ped.gratis) h += '<p class="nota-chica">Te confirmamos el costo exacto por chat y ahí yapeas solo el envío para separar tu pedido (máximo 1 semana).</p>';
     // El medio de pago del producto es parte de los datos del delivery.
     h += campos('Tus datos para el delivery', '',
-      '<div class="variantes-titulo" style="margin-top:12px">El producto lo pagas al recibir con</div><div class="chips">' +
-      ['Yape', 'Efectivo (monto exacto)'].map(v => '<label class="chip' + (v === pagoProducto ? ' activo' : '') + '"><input type="radio" name="pagoprod" value="' + esc(v) + '"' + (v === pagoProducto ? ' checked' : '') + '>' + esc(v) + '</label>').join('') + '</div>');
+      '<div class="variantes-titulo" style="margin-top:12px">El producto lo pagas al recibir con (opcional)</div><div class="chips">' +
+      ['Yape', 'Efectivo (monto exacto)'].map(v => '<button type="button" class="chip' + (v === pagoProducto ? ' activo' : '') + '" data-pago="' + esc(v) + '">' + esc(v) + '</button>').join('') + '</div>');
   }
   if(id === 'shalom'){
     h += yape(fmtPrecio(ped.productos), 'Es el pago de tus productos; el envío (' + (ped.gratis ? 'gratis' : fmtPrecio(costoShalom())) + ') lo pagas al recibir.') +
@@ -1398,6 +1508,17 @@ function renderCarrito(){
     return;
   }
 
+  if(pasoCarrito === 'enviado'){
+    // Después de mandar el pedido NO se vacía solo (por si el cliente no llegó a
+    // enviarlo): se le pregunta.
+    body.innerHTML = '<div class="sheet-pad"><h2>¿Ya enviaste tu pedido?</h2>' +
+      '<p class="nota-chica">Cuando lo envíes te respondemos por el chat para confirmar stock y envío.</p>' +
+      '<button type="button" class="btn btn-primario" data-vaciar-listo>Sí, ya lo envié: vaciar mi carrito</button>' +
+      '<button type="button" class="btn" data-paso="lista">Todavía no, volver a mi carrito</button>' +
+      '<button type="button" class="btn-link" data-paso="canal">Enviarlo otra vez</button></div>';
+    return;
+  }
+
   if(pasoCarrito === 'instagram'){
     // Instagram no permite abrir un DM con el mensaje ya escrito (es una regla
     // de ellos, no hay forma de evitarla). Por eso: se copia el pedido y el
@@ -1410,6 +1531,7 @@ function renderCarrito(){
       '<ol class="pasos"><li>Toca <b>Abrir chat de Instagram</b>: se abre directo nuestro chat.</li><li>Mantén presionado el cuadro de mensaje y elige <b>Pegar</b>. Envía.</li></ol>' +
       '<a class="btn btn-primario" href="' + esc(urlInstagramChat()) + '" target="_blank" rel="noopener">Abrir chat de Instagram (@' + esc(cfg.INSTAGRAM_USUARIO || '') + ')</a>' +
       '<textarea class="pedido-texto" readonly id="pedidoTexto">' + esc(textoPedido()) + '</textarea>' +
+      '<button type="button" class="btn" data-paso="enviado">Ya lo envié ✓</button>' +
       '<button type="button" class="btn-link" data-paso="canal">← Elegir otro medio</button>' +
       '</div>';
     return;
@@ -1547,19 +1669,10 @@ document.getElementById('carritoBody').addEventListener('change', e => {
     if(op) op.scrollIntoView({block: 'start'});
   }
   else if(t.name === 'punto'){ puntoRecojo = Number(t.value) || 0; repintarCarrito(); }
-  else if(t.name === 'pagoprod'){ pagoProducto = t.value; repintarCarrito(); }
-  else if(t.hasAttribute('data-fecha')){ fechaEntrega = t.value; repintarCarrito(); }
-  else if(t.hasAttribute('data-distrito')){ distritoTxt = t.value; guardarDistrito(); repintarCarrito(); }
 });
 document.getElementById('carritoBody').addEventListener('input', e => {
   const t = e.target;
   if(t.dataset.dato){ datos[t.dataset.dato] = t.value; return; }
-  if(t.hasAttribute('data-distrito')){
-    distritoTxt = t.value;
-    guardarDistrito();
-    // Apenas lo escrito coincide con un distrito, se muestra el costo.
-    if(buscarDistrito(distritoTxt)) repintarCarrito('distritoCarrito');
-  }
 });
 document.getElementById('carritoBody').addEventListener('click', e => {
   const t = e.target;
@@ -1568,12 +1681,21 @@ document.getElementById('carritoBody').addEventListener('click', e => {
   // Recordar si el cliente abrió o cerró sus datos (la flechita).
   const sum = t.closest('.datos-form > summary');
   if(sum){ const d = sum.parentNode; datosAbiertos[d.dataset.datos] = !d.open; return; }
+  // Día de entrega, pago del producto y forma de mandar la ubicación: botones que
+  // se pueden tocar otra vez para quitarlos (nada viene marcado de antemano).
+  const dia = t.closest('[data-dia]');
+  if(dia){ fechaEntrega = fechaEntrega === dia.dataset.dia ? '' : dia.dataset.dia; repintarCarrito(); return; }
+  const pago = t.closest('[data-pago]');
+  if(pago){ pagoProducto = pagoProducto === pago.dataset.pago ? '' : pago.dataset.pago; repintarCarrito(); return; }
+  const ubi = t.closest('[data-ubi]');
+  if(ubi){ ubicacionModo = ubi.dataset.ubi; repintarCarrito(); return; }
   const cambio = t.closest('[data-envio]');
   if(cambio){ envioSel = cambio.dataset.envio; guardarEnvio(); repintarCarrito(); return; }
   const cant = t.closest('[data-cant]');
   if(cant){ setCantidad(cant.dataset.id, (carrito[cant.dataset.id] || 0) + Number(cant.dataset.cant)); renderCarrito(); return; }
   const quitar = t.closest('[data-quitar]');
   if(quitar){ setCantidad(quitar.dataset.quitar, 0); renderCarrito(); return; }
+  if(t.closest('[data-vaciar-listo]')){ carrito = {}; guardarCarrito(); renderContador(); pasoCarrito = 'lista'; toast('Listo, tu carrito quedó vacío'); renderCarrito(); return; }
   if(t.closest('[data-vaciar]')){ carrito = {}; guardarCarrito(); renderContador(); renderCarrito(); return; }
   const paso = t.closest('[data-paso]');
   if(paso){ pasoCarrito = paso.dataset.paso; renderCarrito(); return; }
@@ -1583,6 +1705,7 @@ document.getElementById('carritoBody').addEventListener('click', e => {
     contar('cerrar-pedido/' + canal.dataset.canal, 'Cerró pedido por ' + canal.dataset.canal);
     if(canal.dataset.canal === 'whatsapp'){
       window.open(urlWhatsApp(texto), '_blank', 'noopener');
+      pasoCarrito = 'enviado'; renderCarrito();
     } else {
       copiar(texto).then(ok => { copiadoOk = ok; pasoCarrito = 'instagram'; renderCarrito(); });
     }
@@ -1638,6 +1761,15 @@ function ruta(){
   if(abierto) abierto.querySelector('.sheet').scrollTop = 0;
 }
 function cerrarHoja(){
+  // Un combo abierto desde una ficha: la ✕ cierra TODO (para volver a la ficha
+  // está la flecha "←"); si no, "cerrar" es lo mismo que "atrás".
+  if(comboDesdeFicha && location.hash.indexOf('#/combo/') === 0){
+    comboDesdeFicha = false;
+    history.replaceState(null, '', location.pathname + location.search);
+    hashActual = '';
+    ruta();
+    return;
+  }
   // Si se llegó tocando dentro de la página, "cerrar" es lo mismo que "atrás".
   // Si se entró directo con un enlace a un producto, no hay a dónde volver:
   // se limpia la dirección y queda el catálogo.
@@ -1646,6 +1778,9 @@ function cerrarHoja(){
 }
 window.addEventListener('hashchange', () => {
   navegoAdentro = true;
+  hashPrevio = hashActual; hashActual = location.hash;
+  // ¿El combo se abrió desde la ficha de un producto? Entonces tendrá flecha para volver.
+  comboDesdeFicha = location.hash.indexOf('#/combo/') === 0 && hashPrevio.indexOf('#/p/') === 0;
   // Al entrar al carrito siempre se empieza por la lista.
   if(location.hash === '#/carrito') pasoCarrito = 'lista';
   ruta();
@@ -1744,17 +1879,11 @@ function renderEnviosSeccion(){
     (x.extra ? '<p class="envio-extra">' + esc(x.extra) + '</p>' : '') +
     (x.mapa ? '<a class="mapa-link" href="' + esc(x.mapa.url) + '" target="_blank" rel="noopener">' + esc(x.mapa.texto) + '</a>' : '') +
     (x.id === 'moto'
-      ? '<label class="campo"><span>Cotiza tu envío</span>' + selectDistritoHTML('distritoHome', distritoTxt) + '</label>' +
+      ? '<div class="campo"><span>Cotiza tu envío</span>' + selectDistritoHTML('distritoHome', distritoTxt) + '</div>' +
         '<div id="cotizHome">' + cotizacionHTML(distritoTxt, false, false) + '</div>'
       : '') +
     '</div>');
   cont.innerHTML = [0, 1].map(c => '<div class="envios-col">' + tarjetas.filter((t, i) => i % 2 === c).join('') + '</div>').join('');
-  const sel = document.getElementById('distritoHome');
-  if(sel) sel.addEventListener('change', () => {
-    distritoTxt = sel.value;
-    guardarDistrito();
-    document.getElementById('cotizHome').innerHTML = cotizacionHTML(distritoTxt, false, false);
-  });
 }
 
 function renderTodo(){

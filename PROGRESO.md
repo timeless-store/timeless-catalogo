@@ -160,3 +160,13 @@
 - (19-oct, más tarde) El **orden automático queda APAGADO**: Alberto ordena a mano y avisa cuándo usar el del dashboard. Foto del inicio cambiada por una foto general de varios productos (para que no pregunten por uno en particular). "Agotado" sobre la foto del combo agotado. Carrusel de clientes: avanza de la 1 a la 13 y vuelve a empezar, con fotos de tamaño fijo.
 - (19-oct) Inicio en PC: la foto completa a la izquierda y el degradado empieza donde ella termina. Carrusel de clientes 1.5x más rápido y retoma a los 1.5 s. El vuelto en el recojo "se coordina por chat" en todas partes.
 - **Revisión final antes de publicar** (19-oct): sin costos ni claves en el repositorio; 142 archivos (fotos, videos, íconos) cargan; 29 fichas sin textos raros; los 4 envíos probados en celular sin que nada se salga del recuadro; sin errores en la consola.
+
+## 15. Lanzamiento (19 de octubre)
+
+- **Ya no está oculto de Google** (se quitó el `noindex`); se agregaron `sitemap.xml`, datos de la tienda para Google y la dirección principal.
+- En la ficha, la palabra **"Combo"** (subrayada) abre el combo; en él, la flecha "← producto" vuelve a la ficha y la ✕ cierra todo.
+- Cuando no hay promos activas se oculta TODO lo de promociones (sección, botón del inicio, atajo del menú y los textos de envíos y preguntas).
+- **Distrito**: se escribe y salen sugerencias; la flechita ▾ muestra todos y se cierra al tocarla de nuevo.
+- **Día de entrega**: botones por día (mañana a 7 días, sin domingos); nada viene marcado y se puede quitar tocándolo de nuevo. **Pago del producto** (Yape/efectivo): sin marcar y se puede quitar.
+- **Ubicación** (delivery e InDrive): por defecto "te la mando por WhatsApp"; o pegar un link de Google Maps.
+- Al enviar el pedido se pregunta "¿Ya lo enviaste?" y ofrece vaciar el carrito (no se vacía solo, por si el cliente no llegó a enviarlo).
