@@ -676,7 +676,8 @@ function comboHTML(x, ahora){
   const st = estadoCombo(x, ahora);
   const foto = x.pr.foto || fotoPropia((st.casilleros[0] || [])[0]);
   return '<a class="combo' + (st.disponible ? '' : ' combo-agotado') + '" href="#/combo/' + x.i + '">' +
-    '<div class="combo-foto"><img loading="lazy" src="' + esc(foto) + '" alt="' + esc(x.pr.nombre) + '"></div>' +
+    '<div class="combo-foto"><img loading="lazy" src="' + esc(foto) + '" alt="' + esc(x.pr.nombre) + '">' +
+      (st.disponible ? '' : '<div class="tags"><span class="tag tag-agotado">Agotado</span></div>') + '</div>' +
     '<div class="combo-cuerpo">' +
       '<div class="combo-nombre">' + esc(x.pr.nombre) + '</div>' +
       '<div class="precios"><span class="precio-oferta combo-precio">' + fmtPrecio(x.pr.valor) + '</span></div>' +
@@ -1811,18 +1812,26 @@ function renderClientes(){
   const seguir = () => { clearTimeout(reanudar); reanudar = setTimeout(() => { pausa = false; }, 2500); };
   ['pointerdown', 'touchstart', 'wheel', 'mouseenter'].forEach(ev => pista.addEventListener(ev, parar, {passive: true}));
   ['pointerup', 'touchend', 'mouseleave'].forEach(ev => pista.addEventListener(ev, seguir, {passive: true}));
-  let previo = null;
+  // Avanza de la foto 1 a la 13 y vuelve a empezar sin corte (son dos vueltas
+  // iguales: al terminar la primera se salta al inicio). La posición se lleva
+  // con decimales aparte, porque algunos celulares redondean scrollLeft y el
+  // carrusel se quedaba quieto.
+  let previo = null, pos = 0;
+  const VELOCIDAD = 0.04;   // px por milisegundo (~40 px por segundo)
   const paso = t => {
     const mitad = pista.scrollWidth / 2;
-    if(previo !== null && !pausa && mitad > pista.clientWidth){
-      // Hacia la derecha = el contenido avanza a la derecha (scroll hacia atrás).
-      pista.scrollLeft -= (t - previo) * 0.04;
-      if(pista.scrollLeft <= 1) pista.scrollLeft += mitad;
+    if(previo !== null && mitad > pista.clientWidth){
+      if(pausa) pos = pista.scrollLeft;          // si el cliente lo movió, sigue desde ahí
+      else {
+        pos += (t - previo) * VELOCIDAD;
+        if(pos >= mitad) pos -= mitad;
+        pista.scrollLeft = pos;
+      }
     }
     previo = t;
     requestAnimationFrame(paso);
   };
-  pista.scrollLeft = pista.scrollWidth / 2;
+  pista.scrollLeft = 0;
   requestAnimationFrame(paso);
 }
 renderClientes();

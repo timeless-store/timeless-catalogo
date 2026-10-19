@@ -1070,18 +1070,18 @@ label.chip:focus-within{outline:2px solid var(--accent);outline-offset:2px;}
   overflow-x:auto;
   scrollbar-width:none;
   cursor:grab;
+  padding-right:10px;   /* así las dos vueltas miden lo mismo y el salto no se nota */
 }
 .clientes-pista::-webkit-scrollbar{display:none;}
 .clientes-pista img{
   flex:0 0 auto;
   height:280px;
-  width:auto;
-  max-width:70vw;
+  width:210px;   /* tamaño fijo 3:4: así el carrusel sabe cuánto mide aunque las fotos no hayan cargado */
   object-fit:cover;
   border-radius:14px;
   background:var(--chip);
 }
-@media (min-width:640px){ .clientes-pista img{height:340px;} }
+@media (min-width:640px){ .clientes-pista img{height:340px;width:255px;} }
 
 /* "?" en celular: el globo va centrado en la pantalla (antes se cortaba a la mitad) */
 @media (max-width:640px){
@@ -1177,7 +1177,7 @@ details.datos-form .opc{font-weight:500;color:var(--muted);}
   top:0;left:0;right:0;
   width:100%;height:340px;
   object-fit:cover;
-  object-position:center 35%;
+  object-position:center 40%;
   z-index:-1;
   -webkit-mask-image:linear-gradient(180deg, #000 45%, transparent 100%);
   mask-image:linear-gradient(180deg, #000 45%, transparent 100%);
@@ -1194,7 +1194,7 @@ details.datos-form .opc{font-weight:500;color:var(--muted);}
   .hero-foto{
     right:auto;bottom:0;
     width:52%;height:100%;
-    object-position:center 40%;
+    object-position:center center;
     -webkit-mask-image:linear-gradient(90deg, #000 55%, transparent 100%);
     mask-image:linear-gradient(90deg, #000 55%, transparent 100%);
   }

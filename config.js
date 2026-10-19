@@ -121,9 +121,11 @@ const CATALOGO_CONFIG = {
   // Vacío = la sección dice "Muy pronto".
   CLIENTES_FOTOS: ['img/clientes/01.jpg', 'img/clientes/02.jpg', 'img/clientes/03.jpg', 'img/clientes/04.jpg', 'img/clientes/05.jpg', 'img/clientes/06.jpg', 'img/clientes/07.jpg', 'img/clientes/08.jpg', 'img/clientes/09.jpg', 'img/clientes/10.jpg', 'img/clientes/11.jpg', 'img/clientes/12.jpg', 'img/clientes/13.jpg'],
 
+  // Ordenar por la velocidad de venta que manda el dashboard (columna Orden).
+  // APAGADO: Alberto decide el orden a mano y pide usar este solo cuando él diga.
   // Ordenar los productos de cada categoría por la velocidad de venta que manda
   // el dashboard (columna Orden de la lista). false = el orden de productos.csv.
-  ORDEN_AUTOMATICO: true,
+  ORDEN_AUTOMATICO: false,
 
   // Dónde va la sección de Promociones cuando hay combos activos:
   // 'primero' (arriba de Más vendidos) o 'despues-de-mas-vendidos'.
