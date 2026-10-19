@@ -149,3 +149,11 @@
 - Carrito: distritos en lista desplegable, datos del envío plegados (el pago Yape/efectivo va dentro), tocar otra vez una opción la des-elige, "no hacemos envíos domingos ni feriados".
 - Ficha: "− cantidad +" al agregar (máx. 10, "sujeto a disponibilidad"), sin saltar arriba; botón amarillo de restock; empaque (cajita premium / bolsa Ziploc); explicación del 316L; "Escríbenos por DM" con WhatsApp o Instagram; aviso de conexión lenta.
 - "?" centrado en celular y se cierra al tocarlo de nuevo. Botones de Escríbenos más chicos.
+
+## 14. Orden automático, foto del inicio y clientes (19 de octubre)
+
+- **Orden automático**: la lista del dashboard trae "Orden" (qué tan rápido se vende cada producto en su categoría). Dentro de cada categoría: disponibles, restock y agotados, y en cada grupo el que más rápido se vende primero. Se apaga con `ORDEN_AUTOMATICO: false`.
+- **Inicio**: foto de Cemetery Cross, Starglow y Collar Chrome Hearts (`img/inicio.jpg`) con degradado morado → negro: a la izquierda en PC y arriba en celular. Se quitó el video.
+- **Clientes**: 13 capturas de chats recortadas a 3:4 (solo lo que escribió el cliente), en `img/clientes/`. Originales en Escritorio\Alberto\Timeless\Clientes.
+- Combo Spider + Pant Chain Spiderboy (agotado: lleva a los otros combos). Link a Plaza San Miguel en el mapa. 316L: "El acero inoxidable más resistente".
+- El menú de atajos marca solo la sección en la que estás.

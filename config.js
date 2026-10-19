@@ -98,7 +98,8 @@ const CATALOGO_CONFIG = {
   // Olva Courier no va como opción (Alberto prefiere Shalom): solo una nota en Shalom.
   ENVIOS: [
     {id: 'recojo', nombre: 'Recojo sin costo', pago: 'Pago contraentrega',
-     texto: 'En Plaza San Miguel o en Av. La Paz cdras. 6–8, San Miguel. Coordinamos el día y la hora por chat.'},
+     texto: 'En Plaza San Miguel o en Av. La Paz cdras. 6–8, San Miguel (el punto exacto te lo damos por chat). Coordinamos el día y la hora por chat.',
+     mapa: {texto: '📍 Ver Plaza San Miguel en el mapa', url: 'https://www.google.com/maps/search/?api=1&query=Plaza%20San%20Miguel%2C%20Lima'}},
     {id: 'moto', nombre: 'Delivery con motorizado', pago: 'Pago contraentrega · adelantas solo el envío',
      texto: 'A casi todo Lima Metropolitana, de lunes a sábado de 11am a 7pm (no hacemos envíos domingos ni feriados). Elige tu distrito y te mostramos el costo aproximado. Adelantando el envío por Yape, tu pedido queda separado; el producto lo pagas al recibir.'},
     {id: 'shalom', nombre: 'Shalom — todo el Perú', pago: 'Pagas el producto antes · el envío al recibir',
@@ -118,7 +119,11 @@ const CATALOGO_CONFIG = {
 
   // Fotos de clientes con sus pedidos (carrusel "Clientes"). Ej: 'img/clientes/1.jpg'.
   // Vacío = la sección dice "Muy pronto".
-  CLIENTES_FOTOS: [],
+  CLIENTES_FOTOS: ['img/clientes/01.jpg', 'img/clientes/02.jpg', 'img/clientes/03.jpg', 'img/clientes/04.jpg', 'img/clientes/05.jpg', 'img/clientes/06.jpg', 'img/clientes/07.jpg', 'img/clientes/08.jpg', 'img/clientes/09.jpg', 'img/clientes/10.jpg', 'img/clientes/11.jpg', 'img/clientes/12.jpg', 'img/clientes/13.jpg'],
+
+  // Ordenar los productos de cada categoría por la velocidad de venta que manda
+  // el dashboard (columna Orden de la lista). false = el orden de productos.csv.
+  ORDEN_AUTOMATICO: true,
 
   // Dónde va la sección de Promociones cuando hay combos activos:
   // 'primero' (arriba de Más vendidos) o 'despues-de-mas-vendidos'.

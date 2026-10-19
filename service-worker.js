@@ -5,7 +5,7 @@
 //
 // ⚠️ SUBIR ESTE NÚMERO EN CADA CAMBIO (v1 → v2 → v3…). Si no, los celulares
 // que ya abrieron la página siguen viendo la versión vieja.
-const CACHE = 'timeless-catalogo-v22';
+const CACHE = 'timeless-catalogo-v23';
 const ASSETS = [
   './',
   './index.html',

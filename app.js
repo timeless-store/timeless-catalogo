@@ -195,7 +195,8 @@ function aplicarEstado(productos, filas){
   const mapa = {};
   filas.slice(1).forEach(r => {
     const n = norm(celda(r, 'producto'));
-    if(n) mapa[n] = {estado: norm(celda(r, 'estado')), puesto: parseInt(celda(r, 'bestseller'), 10) || 0};
+    if(n) mapa[n] = {estado: norm(celda(r, 'estado')), puesto: parseInt(celda(r, 'bestseller'), 10) || 0,
+                      orden: parseInt(celda(r, 'orden'), 10) || 0};
   });
   productos.forEach(p => {
     const nombres = p.inventario.length ? p.inventario : [p.nombre];
@@ -213,6 +214,10 @@ function aplicarEstado(productos, filas){
       p.proximamente = false;
       p.visible = p.visible && (est !== 'oculto' || p.visibleSi);
     }
+    // Orden = qué tan rápido se vende dentro de su categoría (1 = el más rápido).
+    // El par de anillos son dos filas: vale la menor.
+    const ordenes = suyas.map(f => f.orden).filter(n => n > 0);
+    p.orden = ordenes.length ? Math.min.apply(null, ordenes) : 0;
     const puestos = suyas.map(f => f.puesto).filter(n => n > 0);
     p.bestSeller = puestos.length ? Math.min.apply(null, puestos) : 0;
   });
@@ -284,6 +289,8 @@ function resumirEstado(e, v){
   e.nuevo = v.some(p => p.nuevo);
   const puestos = v.map(p => p.bestSeller).filter(n => n > 0);
   e.bestSeller = puestos.length ? Math.min.apply(null, puestos) : 0;
+  const ords = v.map(p => p.orden).filter(n => n > 0);
+  e.orden = ords.length ? Math.min.apply(null, ords) : 0;
   e.linea = (v.find(p => p.linea) || {}).linea || '';
   e.material = (v.find(p => p.material) || {}).material || '';
   e.coleccion = (v.find(p => p.coleccion) || {}).coleccion || '';
@@ -546,7 +553,11 @@ function agrupar(){
     grupos[k].items.push({e: e, i: i});
   });
   Object.keys(grupos).forEach(k => {
-    grupos[k].items.sort((a, b) => (rangoEstado(a.e) - rangoEstado(b.e)) || (a.i - b.i));
+    // Primero los que hay, luego próximamente, restock y agotados; entre iguales,
+    // por el Orden del dashboard (el que más rápido se vende primero) y, si no
+    // hay, por el orden de la hoja.
+    const ord = x => (cfg.ORDEN_AUTOMATICO !== false && x.e.orden) ? x.e.orden : 999;
+    grupos[k].items.sort((a, b) => (rangoEstado(a.e) - rangoEstado(b.e)) || (ord(a) - ord(b)) || (a.i - b.i));
     grupos[k].items = grupos[k].items.map(x => x.e);
   });
   return Object.keys(grupos).sort((a, b) => {
@@ -721,7 +732,8 @@ function renderCombo(){
           '</div>';
       }).join('') +
       (!st.disponible
-        ? '<button type="button" class="btn" disabled>Agotado: mira los otros combos</button>'
+        ? '<p class="nota-chica combo-agotado-txt">Este combo se agotó. ¿Quieres otra pant chain o un collar?</p>' +
+          '<button type="button" class="btn btn-primario" data-otros-combos>Ver los otros combos</button>'
         : (st.completo
           ? '<button type="button" class="btn btn-primario" data-combo-agregar="' + x.i + '">Agregar combo al carrito · ' + fmtPrecio(x.pr.valor) + '</button>'
           : '<button type="button" class="btn" disabled>Elige ' + esc(falta.join(' y ')) + '</button>')) +
@@ -729,6 +741,12 @@ function renderCombo(){
     '</div>';
 }
 document.getElementById('comboBody').addEventListener('click', e => {
+  // Combo agotado: vuelve a la sección de promos para elegir otro.
+  if(e.target.closest('[data-otros-combos]')){
+    cerrarHoja();
+    setTimeout(() => { const s = document.getElementById('promos'); if(s) s.scrollIntoView({behavior: 'smooth'}); }, 150);
+    return;
+  }
   const op = e.target.closest('[data-op]');
   if(op && comboAbierto !== null){
     (comboSel[comboAbierto] = comboSel[comboAbierto] || [])[Number(op.dataset.casillero)] = op.dataset.op;
@@ -850,6 +868,31 @@ if(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches
     rotaTimer = setInterval(siguiente, 1200);
   });
 }
+
+/* ---------- Menú de atajos: se marca solo la sección en la que estás ----------
+   Al bajar por la página, el atajo de la sección visible (Promos, Más vendidos,
+   Cinturones…) queda resaltado y el menú se desliza para que se vea. */
+let seccionMarcada = null, marcando = false;
+function marcarSeccion(){
+  marcando = false;
+  const nav = document.getElementById('catsNav');
+  const links = Array.prototype.slice.call(nav.querySelectorAll('a[data-cat]'));
+  const limite = document.querySelector('.top').getBoundingClientRect().bottom + 60;
+  let actual = null;
+  links.forEach(a => {
+    const s = document.getElementById(a.dataset.cat);
+    if(s && s.getBoundingClientRect().top <= limite) actual = a;
+  });
+  links.forEach(a => a.classList.toggle('activo', a === actual));
+  if(actual && actual !== seccionMarcada){
+    seccionMarcada = actual;
+    nav.scrollTo({left: actual.offsetLeft - (nav.clientWidth - actual.offsetWidth) / 2, behavior: 'smooth'});
+  }
+  if(!actual) seccionMarcada = null;
+}
+window.addEventListener('scroll', () => {
+  if(!marcando){ marcando = true; setTimeout(marcarSeccion, 80); }
+}, {passive: true});
 
 document.getElementById('marcaLink').addEventListener('click', e => {
   e.preventDefault();
@@ -1193,7 +1236,7 @@ function renderFicha(indice){
         (p.material
           ? '<div class="dato"><dt>Material</dt><dd>' + esc(p.material) +
             // El 316L se explica: es lo que justifica su precio.
-            (/316l/i.test(p.material) ? '<span class="nota-316">El 316L es el acero inoxidable más resistente: aguanta el agua, el sudor y el uso diario sin oxidarse ni perder su color.</span>' : '') +
+            (/316l/i.test(p.material) ? '<span class="nota-316">El acero inoxidable más resistente.</span>' : '') +
             '</dd></div>'
           : '') +
         dato('Empaque', p.empaque) +
@@ -1298,7 +1341,8 @@ function detalleEnvioHTML(id, ped){
   if(id === 'recojo'){
     h += '<div class="chips">' + (cfg.PUNTOS_RECOJO || []).map((pt, i) =>
       '<label class="chip' + (i === puntoRecojo ? ' activo' : '') + '"><input type="radio" name="punto" value="' + i + '"' + (i === puntoRecojo ? ' checked' : '') + '>' + esc(pt) + '</label>').join('') + '</div>' +
-      '<p class="nota-chica">Coordinamos el día y la hora por chat. Pagas al recibir (o por adelantado, si prefieres).</p>';
+      '<p class="nota-chica">Coordinamos el día y la hora por chat. Pagas al recibir (o por adelantado, si prefieres).</p>' +
+      (((cfg.ENVIOS || []).find(x => x.id === 'recojo') || {}).mapa ? '<a class="mapa-link" target="_blank" rel="noopener" href="' + esc(cfg.ENVIOS.find(x => x.id === 'recojo').mapa.url) + '">' + esc(cfg.ENVIOS.find(x => x.id === 'recojo').mapa.texto) + '</a>' : '');
   }
   if(id === 'moto'){
     const l = limitesFecha();
@@ -1697,6 +1741,7 @@ function renderEnviosSeccion(){
     '<div class="envio-card"><div class="envio-titulo">' + esc(x.nombre) + '</div>' +
     '<div class="envio-pago">' + esc(x.pago) + '</div><p>' + esc(x.texto) + '</p>' +
     (x.extra ? '<p class="envio-extra">' + esc(x.extra) + '</p>' : '') +
+    (x.mapa ? '<a class="mapa-link" href="' + esc(x.mapa.url) + '" target="_blank" rel="noopener">' + esc(x.mapa.texto) + '</a>' : '') +
     (x.id === 'moto'
       ? '<label class="campo"><span>Cotiza tu envío</span>' + selectDistritoHTML('distritoHome', distritoTxt) + '</label>' +
         '<div id="cotizHome">' + cotizacionHTML(distritoTxt, false, false) + '</div>'
@@ -1781,11 +1826,6 @@ function renderClientes(){
   requestAnimationFrame(paso);
 }
 renderClientes();
-// Quien pidió "menos movimiento" en su celular no ve el video moverse.
-(function(){
-  const v = document.querySelector('.hero-bg');
-  if(v && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches){ v.removeAttribute('autoplay'); v.pause(); }
-})();
 
 document.getElementById('pieInstagram').href = urlInstagram();
 document.getElementById('heroWa').href = urlWhatsApp('¡Hola Timeless! Quiero consultar por un producto');
