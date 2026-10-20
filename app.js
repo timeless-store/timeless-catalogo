@@ -1897,6 +1897,7 @@ function renderCarrito(){
       '<h2>Cerrar pedido</h2>' +
       '<p class="pregunta">¿Coordinamos por WhatsApp o por Instagram?</p>' +
       '<p class="nota-chica">Te respondemos por el chat que elijas para confirmar stock y tu envío. Si justo algo se agotó, te avisamos ahí.</p>' +
+      notaReintentoHTML() +
       '<button type="button" class="btn btn-wa" data-canal="whatsapp">WhatsApp</button>' +
       '<button type="button" class="btn" data-canal="instagram">Instagram</button>' +
       '<button type="button" class="btn-link" data-paso="lista">← Volver al carrito</button>' +
@@ -1909,6 +1910,7 @@ function renderCarrito(){
     // enviarlo): se le pregunta.
     body.innerHTML = '<div class="sheet-pad"><h2>¿Ya enviaste tu pedido?</h2>' +
       '<p class="nota-chica">Cuando lo envíes te respondemos por el chat para confirmar stock y envío.</p>' +
+      notaReintentoHTML() +
       '<button type="button" class="btn btn-primario" data-vaciar-listo>Sí, ya lo envié: vaciar mi carrito</button>' +
       '<button type="button" class="btn" data-paso="lista">Todavía no, volver a mi carrito</button>' +
       '<button type="button" class="btn-link" data-paso="canal">Enviarlo otra vez</button></div>';
@@ -2002,6 +2004,12 @@ function renderCarrito(){
     '</div>';
 }
 
+// A veces WhatsApp tarda en mostrar o "pierde" los primeros mensajes de un número
+// nuevo: se le avisa al cliente qué hacer si no le respondemos.
+function notaReintentoHTML(){
+  return '<p class="nota-reintento"><b>¿No te respondemos?</b> A veces WhatsApp se demora en mostrar los mensajes. ' +
+    'Escríbenos otra vez o mándanos un DM por Instagram' + (cfg.INSTAGRAM_USUARIO ? ' (@' + esc(cfg.INSTAGRAM_USUARIO) + ')' : '') + '.</p>';
+}
 function urlInstagram(){
   return 'https://www.instagram.com/' + encodeURIComponent(cfg.INSTAGRAM_USUARIO || '') + '/';
 }
