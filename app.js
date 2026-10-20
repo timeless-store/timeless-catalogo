@@ -921,18 +921,42 @@ let tarjetasObservador = null;
 function animarTarjetas(raiz){
   if(!('IntersectionObserver' in window) || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
   if(!tarjetasObservador){
+    // Aparecen un poco ANTES de entrar a la pantalla (margen de 25% hacia abajo): en
+    // iPhone, al bajar rápido, el observador avisa tarde y quedaban huecos negros.
     tarjetasObservador = new IntersectionObserver(entradas => entradas.forEach(en => {
       if(en.isIntersecting){ en.target.classList.add('visible'); tarjetasObservador.unobserve(en.target); }
-    }), {rootMargin: '0px 0px -8% 0px', threshold: 0.08});
+    }), {rootMargin: '0px 0px 25% 0px', threshold: 0});
   }
   raiz.querySelectorAll('.grilla, .fila, .combos').forEach(cont => {
     Array.prototype.forEach.call(cont.children, (t, i) => {
       t.classList.add('aparece');
-      t.style.transitionDelay = (i % 4) * 70 + 'ms';
+      t.style.transitionDelay = (i % 4) * 50 + 'ms';
       tarjetasObservador.observe(t);
     });
   });
+  revisarTarjetas();
 }
+// Respaldo: si el observador se atrasa (iPhone, deslizamiento con impulso), al
+// bajar se revisa a mano que ninguna tarjeta cercana quede invisible.
+let revisandoTarjetas = false;
+function revisarTarjetas(){
+  const limite = window.innerHeight * 1.25;
+  document.querySelectorAll('.aparece:not(.visible)').forEach(t => {
+    const r = t.getBoundingClientRect();
+    if(r.top < limite && r.bottom > -200){ t.classList.add('visible'); if(tarjetasObservador) tarjetasObservador.unobserve(t); }
+  });
+  // Fotos perezosas que ya están cerca: se piden ya (Safari las pide muy tarde).
+  document.querySelectorAll('img[loading="lazy"]').forEach(img => {
+    const r = img.getBoundingClientRect();
+    if(r.top < window.innerHeight + 1200 && r.bottom > -600) img.loading = 'eager';
+  });
+}
+window.addEventListener('scroll', () => {
+  if(revisandoTarjetas) return;
+  revisandoTarjetas = true;
+  setTimeout(() => { revisandoTarjetas = false; revisarTarjetas(); }, 120);
+}, {passive: true});
+window.addEventListener('scrollend', revisarTarjetas);
 
 // Los atajos bajan con scroll en vez de cambiar la dirección: el "#" de la
 // dirección se reserva para la ficha y el carrito.
@@ -1557,7 +1581,31 @@ function renderFicha(indice){
       document.getElementById('galCuenta').textContent = i + '/' + medios.length;
     }, {passive:true});
   }
-  if(indice > 0) pista.scrollLeft = pista.clientWidth * indice;
+  // Grupo con fotos de todos juntos (Black/White Spider): el color elegido sigue a la
+  // foto que se está viendo, para que nadie pida un color distinto al que miraba.
+  if(varias && e.juntos && e.variantes.length > 1){
+    let finDeslizar = null;
+    pista.addEventListener('scroll', () => {
+      clearTimeout(finDeslizar);
+      finDeslizar = setTimeout(() => {
+        if(!pista.clientWidth || !pista.isConnected || ENTRADA_POR_ID[fichaEntradaId] !== e) return;
+        const f = medios[Math.round(pista.scrollLeft / pista.clientWidth)];
+        // Solo si la foto es de UN color (la portada compartida no cambia nada).
+        const duenas = e.variantes.filter(v => v.fotos.indexOf(f) > -1);
+        if(duenas.length !== 1 || duenas[0].id === fichaVarId) return;
+        const i = Math.round(pista.scrollLeft / pista.clientWidth);
+        fichaVarId = duenas[0].id;
+        const sheet = document.querySelector('#fichaOverlay .sheet');
+        const top = sheet ? sheet.scrollTop : 0;
+        renderFicha(i);
+        if(sheet) sheet.scrollTop = top;
+      }, 180);
+    }, {passive:true});
+  }
+  if(indice > 0){
+    pista.scrollLeft = pista.clientWidth * indice;
+    if(varias) document.getElementById('galCuenta').textContent = (indice + 1) + '/' + medios.length;
+  }
   prepararGaleria(pista);
 }
 
