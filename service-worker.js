@@ -5,7 +5,7 @@
 //
 // ⚠️ SUBIR ESTE NÚMERO EN CADA CAMBIO (v1 → v2 → v3…). Si no, los celulares
 // que ya abrieron la página siguen viendo la versión vieja.
-const CACHE = 'timeless-catalogo-v33';
+const CACHE = 'timeless-catalogo-v34';
 const ASSETS = [
   './',
   './index.html',
@@ -33,7 +33,9 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      // Solo borra las cachés propias (mismo prefijo): la copia de pruebas vive en el
+      // mismo dominio y usa otro prefijo, así no se borran entre sí.
+      Promise.all(keys.filter((k) => k !== CACHE && k.indexOf(CACHE.replace(/\d+$/, '')) === 0).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
