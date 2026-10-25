@@ -1432,3 +1432,4 @@ html.sin-scroll{overflow:hidden;}
 /* Aviso "¿No te respondemos?" al cerrar el pedido */
 .nota-reintento{margin:12px 0;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:13px;line-height:1.5;color:var(--muted);}
 .nota-reintento b{color:var(--bone);}
+

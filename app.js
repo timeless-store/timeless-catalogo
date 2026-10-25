@@ -375,14 +375,29 @@ function filasAPromos(rows){
     alcance: col(r, 'productos').split('|').map(s => s.trim()).filter(Boolean),
     cantidad: parseInt(col(r, 'cantidad'), 10) || 0,
     valor: parseMoney(col(r, 'valor')),
+    desde: parseFechaLima(col(r, 'desde')),   // vacío = ya empezó
     hasta: parseFechaLima(col(r, 'hasta')),
     activa: esSi(col(r, 'activa')),
     texto: col(r, 'texto'),
     foto: col(r, 'foto'),   // foto del combo (la del Canva), opcional
+    // "Producto=ruta;Producto2=ruta": si ese producto se agota, se QUITA del combo y
+    // la foto cambia a esa ruta (solo para los que Alberto no puede fotografiar de nuevo).
+    fotoSiAgota: col(r, 'fotosiagota').split(';').map(s => s.trim()).filter(Boolean).map(s => {
+      const k = s.indexOf('=');
+      return k > 0 ? {producto: norm(s.slice(0, k)), foto: s.slice(k + 1).trim()} : null;
+    }).filter(Boolean),
   })).filter(pr => pr.nombre && pr.alcance.length && pr.valor > 0);
+}
+// ¿Ya empezó? (VER_PROMOS_ANTES solo está prendido en la página de pruebas.)
+function promoYaEmpezo(pr, ahora){
+  if(cfg.VER_PROMOS_ANTES) return true;
+  if(pr.desde === null) return true;
+  if(isNaN(pr.desde)) return false;   // fecha mal escrita: no se muestra
+  return ahora >= pr.desde;
 }
 function promoActiva(pr, ahora){
   if(!pr.activa) return false;
+  if(!promoYaEmpezo(pr, ahora)) return false;
   if(pr.hasta === null) return true;
   if(isNaN(pr.hasta)) return false;   // fecha mal escrita: no se aplica
   return ahora < pr.hasta;
@@ -536,9 +551,10 @@ function cargarPromos(){
   return fetchCSV(cfg.CSV_PROMOS).then(rows => {
     saveCache(rows, PROMOS_KEY);
     PROMOS = filasAPromos(rows);
+    PROMOS_LISTAS = true;
   }).catch(() => {
     const guardado = loadCache(PROMOS_KEY);
-    if(guardado) PROMOS = filasAPromos(guardado);
+    if(guardado){ PROMOS = filasAPromos(guardado); PROMOS_LISTAS = true; }
   });
 }
 
@@ -662,6 +678,7 @@ function combosActivos(ahora){
 const PROMO_GRACIA_MS = (cfg.PROMO_GRACIA_MIN == null ? 5 : cfg.PROMO_GRACIA_MIN) * 60 * 1000;
 function promoVisible(pr, ahora){
   if(!pr.activa) return false;
+  if(!promoYaEmpezo(pr, ahora)) return false;
   if(pr.hasta === null) return true;
   if(isNaN(pr.hasta)) return false;
   return ahora < pr.hasta + PROMO_GRACIA_MS;
@@ -697,7 +714,19 @@ function fotoPropia(p){
 // sola opción (ej. la Pant Chain Skeleton), va elegida sola. Si lo elegido se
 // agota, se des-elige.
 function estadoCombo(x, ahora){
-  const casilleros = x.pr.alcance.map(opcionesCasillero);
+  // Productos de "FotoSiAgota" (en promos.csv): si se agotan se QUITAN del combo (no se
+  // muestran como "Agotado") y la portada cambia a la foto alterna. Los demás
+  // productos agotados se quedan visibles como "Agotado". Nunca se vacía un casillero.
+  const especiales = x.pr.fotoSiAgota || [];
+  let fotoAlt = '';
+  const casilleros = x.pr.alcance.map(token => {
+    const ops = opcionesCasillero(token);
+    const quitar = ops.filter(p => !p.disponible && especiales.some(f => f.producto === norm(p.nombre)));
+    if(!quitar.length || quitar.length === ops.length) return ops;
+    const f = especiales.find(f => f.producto === norm(quitar[0].nombre));
+    if(f && f.foto) fotoAlt = f.foto;
+    return ops.filter(p => quitar.indexOf(p) === -1);
+  });
   const sel = comboSel[x.i] = casilleros.map((ops, s) => {
     const previo = (comboSel[x.i] || [])[s];
     const ok = ops.find(p => p.id === previo && p.disponible);
@@ -705,7 +734,7 @@ function estadoCombo(x, ahora){
     return ops.length === 1 && ops[0].disponible ? ops[0].id : null;
   });
   const elegidos = sel.map(id => POR_ID[id]).filter(Boolean);
-  return {casilleros: casilleros, sel: sel, completo: sel.every(Boolean),
+  return {casilleros: casilleros, sel: sel, completo: sel.every(Boolean), fotoAlt: fotoAlt,
           // ¿Se puede armar? Cada casillero tiene que tener al menos una opción con stock.
           disponible: casilleros.every(ops => ops.some(p => p.disponible)),
           normal: elegidos.reduce((a, p) => a + precioVigente(p, ahora), 0),
@@ -713,9 +742,22 @@ function estadoCombo(x, ahora){
           gratis: casilleros.some(ops => ops.length && ops.every(p => p.envioGratis))};
 }
 // Tarjeta del combo en la página: la foto del combo (la del Canva), precio y "Arma tu combo".
+// Lo que costarían las opciones sin promo, de la más barata a la más cara (para
+// mostrar "antes S/95–100" tachado). Solo cuentan las opciones disponibles.
+function rangoNormal(st, ahora){
+  let min = 0, max = 0;
+  st.casilleros.forEach(ops => {
+    const hay = ops.filter(p => p.disponible), lista = (hay.length ? hay : ops).map(p => precioVigente(p, ahora));
+    if(!lista.length) return;
+    min += Math.min.apply(null, lista); max += Math.max.apply(null, lista);
+  });
+  return {min: min, max: max};
+}
+const fmtRango = (a, b) => a === b ? fmtPrecio(a) : fmtPrecio(a) + '–' + fmtPrecio(b).replace('S/', '');
 function comboHTML(x, ahora){
   const st = estadoCombo(x, ahora);
-  const foto = x.pr.foto || fotoPropia((st.casilleros[0] || [])[0]);
+  const foto = st.fotoAlt || x.pr.foto || fotoPropia((st.casilleros[0] || [])[0]);
+  const rn = rangoNormal(st, ahora);
   // Ya pasó la hora de fin (los minutos en 00:00:00 antes de que desaparezca).
   if(!promoActiva(x.pr, ahora)){
     return '<div class="combo combo-agotado">' +
@@ -730,7 +772,8 @@ function comboHTML(x, ahora){
       (st.disponible ? '' : '<div class="tags"><span class="tag tag-agotado">Agotado</span></div>') + '</div>' +
     '<div class="combo-cuerpo">' +
       '<div class="combo-nombre">' + esc(x.pr.nombre) + '</div>' +
-      '<div class="precios"><span class="precio-oferta combo-precio">' + fmtPrecio(x.pr.valor) + '</span></div>' +
+      '<div class="precios">' + (rn.max > x.pr.valor ? '<span class="precio-antes">' + fmtRango(rn.min, rn.max) + '</span>' : '') +
+        '<span class="precio-oferta combo-precio">' + fmtPrecio(x.pr.valor) + '</span></div>' +
       (st.gratis ? '<div class="envio-gratis">Con envío gratis</div>' : '') +
       (x.pr.hasta ? '<div class="cuenta">Termina en <b class="mono" data-hasta="' + x.pr.hasta + '">' + fmtCuenta(x.pr.hasta - ahora) + '</b></div>' : '') +
       (st.disponible ? '<span class="btn btn-primario">Arma tu combo</span>' : '<span class="btn" aria-disabled="true">Agotado: mira los otros combos</span>') +
@@ -761,9 +804,9 @@ function renderCombo(){
   const falta = st.casilleros.map((ops, s) => st.sel[s] ? '' : (ELIGE[norm(ops[0] ? ops[0].categoria : '')] || 'Elige uno').replace(/^Elige tu /, 'tu ')).filter(Boolean);
   body.innerHTML =
     (comboDesdeFicha ? '<button type="button" class="sheet-volver" data-volver aria-label="Volver">← ' + esc(ultimaFichaNombre) + '</button>' : '') +
-    (x.pr.foto ? '<div class="galeria"><img class="combo-portada" src="' + esc(x.pr.foto) + '" alt="' + esc(x.pr.nombre) + '"></div>' : '') +
+    (st.fotoAlt || x.pr.foto ? '<div class="galeria"><img class="combo-portada" src="' + esc(st.fotoAlt || x.pr.foto) + '" alt="' + esc(x.pr.nombre) + '"></div>' : '') +
     '<div class="sheet-pad">' +
-      '<div class="eyebrow">Promoción</div>' +
+      '<div class="eyebrow">' + esc(cfg.PROMOS_ETIQUETA || 'Promoción') + '</div>' +
       '<h2>' + esc(x.pr.nombre) + '</h2>' +
       '<div class="ficha-precios"><div class="precios"><span class="precio-oferta">' + fmtPrecio(x.pr.valor) + '</span>' +
         (st.completo && st.normal > x.pr.valor ? '<span class="precio-antes">' + fmtPrecio(st.normal) + '</span>' : '') + '</div></div>' +
@@ -776,7 +819,7 @@ function renderCombo(){
           (ops.length > 1
             ? '<div class="chips">' + ops.map(p => '<button type="button" class="chip' + (p.id === st.sel[s] ? ' activo' : '') + (p.disponible ? '' : ' agotado') + '"' +
                 (p.disponible ? '' : ' disabled') + ' data-casillero="' + s + '" data-op="' + esc(p.id) + '">' +
-                esc(nombreCorto(p)) + (p.disponible ? '' : ' · Agotado') + '</button>').join('') + '</div>'
+                esc(nombreCorto(p)) + (p.disponible ? (p.quedan ? ' · ' + textoQuedan(p.quedan, false) : '') : ' · Agotado') + '</button>').join('') + '</div>'
             : '') +
           (elegido
             ? '<div class="combo-elegido">' + esc(elegido.nombre) + '</div>' + tiraMediosHTML(elegido)
@@ -789,7 +832,7 @@ function renderCombo(){
         : (st.completo
           ? '<button type="button" class="btn btn-primario" data-combo-agregar="' + x.i + '">Agregar combo al carrito · ' + fmtPrecio(x.pr.valor) + '</button>'
           : '<button type="button" class="btn" disabled>Elige ' + esc(falta.join(' y ')) + '</button>')) +
-      '<p class="nota-chica" style="text-align:center">El precio de la promo se aplica solo en tu carrito.</p>' +
+      '<p class="nota-chica" style="text-align:center">Entra a tu carrito como un solo ítem, con su precio de promo. ¿Quieres algo más? Agrégalo aparte, a su precio normal.</p>' +
     '</div>';
 }
 document.getElementById('comboBody').addEventListener('click', e => {
@@ -812,26 +855,30 @@ document.getElementById('comboBody').addEventListener('click', e => {
   }
   const add = e.target.closest('[data-combo-agregar]');
   if(add){
-    const ids = comboSel[Number(add.dataset.comboAgregar)] || [];
-    // Que no pase de lo que queda (ej.: queda 1 y ya lo tiene en el carrito).
-    const pedidos = {}; ids.forEach(id => { pedidos[id] = (pedidos[id] || 0) + 1; });
-    const sinStock = Object.keys(pedidos).find(id => (carrito[id] || 0) + pedidos[id] > maxDe(id));
-    if(ids.length && sinStock && ids.every(id => sePuedePedir(POR_ID[id]))){
-      toast('De ' + POR_ID[sinStock].nombre + ' ' + (maxDe(sinStock) === 1 ? 'solo queda 1' : 'solo quedan ' + maxDe(sinStock)) + ': ya lo tienes en tu carrito');
-      return;
-    }
-    if(ids.length && ids.every(id => sePuedePedir(POR_ID[id]))){
-      ids.forEach(id => agregar(id));
-      toast('Combo agregado: el precio de la promo ya está en tu carrito');
-      location.hash = '#/carrito';
+    const i = Number(add.dataset.comboAgregar), pr = PROMOS[i];
+    const ids = comboSel[i] || [];
+    if(pr && ids.length && ids.every(id => sePuedePedir(POR_ID[id])) && promoActiva(pr, Date.now())){
+      // El combo entra al carrito como UN solo ítem (con su precio de promo). Si no
+      // queda stock para otro igual (ej.: queda 1 y ya lo tiene), setCantidad avisa.
+      const k = claveCombo(pr, ids), antes = carrito[k] || 0;
+      setCantidad(k, antes + 1);
+      if((carrito[k] || 0) > antes){
+        contar('combo/' + i, 'Agregó combo: ' + pr.nombre);
+        toast('Combo agregado al carrito');
+        location.hash = '#/carrito';
+      }
     }
   }
 });
 function promosSeccionHTML(ahora){
   const combos = combosVisibles(ahora);
   if(!combos.length) return '';
-  return '<section class="cat" id="promos"><h2 class="cat-titulo">Promociones</h2>' +
-    '<p class="sub-desc">Toca un combo, elige tus productos (con sus fotos y videos) y agrégalo: el precio de la promo se aplica solo en tu carrito.</p>' +
+  // Título y subtítulo de la campaña (config.js). Vacíos = los de siempre.
+  const titulo = cfg.PROMOS_TITULO || 'Promociones';
+  const sub = cfg.PROMOS_SUBTITULO || 'Toca un combo, elige tus productos (con sus fotos y videos) y agrégalo: el precio de la promo se aplica solo en tu carrito.';
+  return '<section class="cat" id="promos"><h2 class="cat-titulo">' + esc(titulo) + '</h2>' +
+    '<p class="sub-desc">' + esc(sub) + '</p>' +
+    (cfg.PROMOS_TITULO ? '<p class="sub-desc">Toca un combo, elige tus productos (con sus fotos y videos) y agrégalo al carrito.</p>' : '') +
     // Los combos que ya no se pueden armar (algo agotado) van al final.
     '<div class="combos">' + combos.map(x => ({x: x, ok: estadoCombo(x, ahora).disponible}))
       .sort((a, b) => (b.ok - a.ok) || (a.x.i - b.x.i)).map(c => comboHTML(c.x, ahora)).join('') + '</div></section>';
@@ -849,8 +896,34 @@ function renderHeroPromo(ahora){
       '<span class="hero-promo-sub">Terminaron el ' + fechaCortaLima(Math.min.apply(null, fines)) + ' · Atento a las próximas</span></a>';
     return;
   }
-  el.innerHTML = '<a class="hero-promo" href="#promos" data-scroll="promos"><span class="hero-promo-titulo">🔥 Promos disponibles</span>' +
-    '<span class="hero-promo-sub">' + (fines.length ? 'Hasta el ' + fechaCortaLima(Math.min.apply(null, fines)) + ' · ' : '') + 'Ver promos →</span></a>';
+  el.innerHTML = '<a class="hero-promo" href="#promos" data-scroll="promos"><span class="hero-promo-titulo">' + esc(cfg.PROMOS_HERO || '🔥 Promos disponibles') + '</span>' +
+    '<span class="hero-promo-sub">' + (cfg.PROMOS_HERO_SUB ? esc(cfg.PROMOS_HERO_SUB) + ' · ' : '') + (fines.length ? 'Hasta el ' + fechaCortaLima(Math.min.apply(null, fines)) + ' · ' : '') + 'Ver promos →</span></a>';
+}
+
+/* Foto del inicio por fechas (config.js, HERO_FOTOS): cada campaña (Halloween, Cyber Wow…)
+   tiene su banner en la portada SOLO entre sus fechas; fuera de ellas vuelve la foto
+   de siempre (img/inicio.jpg). Si la imagen no carga, se queda la de siempre. */
+const HERO_FOTO_NORMAL = 'img/inicio.jpg';
+let heroFotoActual = HERO_FOTO_NORMAL;
+function fotoDelInicio(ahora){
+  const lista = cfg.HERO_FOTOS || [];
+  for(let i = 0; i < lista.length; i++){
+    const f = lista[i], d = parseFechaLima(f.desde), h = parseFechaLima(f.hasta);
+    if(!f.foto || isNaN(d) || isNaN(h)) continue;
+    // En la página de pruebas (VER_PROMOS_ANTES) se ve la primera aunque no haya llegado la fecha.
+    if(cfg.VER_PROMOS_ANTES ? ahora < h : (d === null || ahora >= d) && (h === null || ahora < h)) return f.foto;
+  }
+  return HERO_FOTO_NORMAL;
+}
+function aplicarFotoInicio(ahora){
+  const quiere = fotoDelInicio(ahora);
+  if(quiere === heroFotoActual) return;
+  const poner = ruta => document.querySelectorAll('.hero-foto, .hero-foto-fondo').forEach(img => { img.src = ruta; });
+  if(quiere === HERO_FOTO_NORMAL){ heroFotoActual = quiere; poner(quiere); return; }
+  const prueba = new Image();
+  prueba.onload = () => { heroFotoActual = quiere; poner(quiere); };
+  prueba.onerror = () => {};   // no existe o no cargó: se queda la foto de siempre
+  prueba.src = quiere;
 }
 
 function renderGrilla(){
@@ -859,6 +932,7 @@ function renderGrilla(){
   const nav = document.getElementById('catsNav');
   const grupos = agrupar();
   renderHeroPromo(ahora);
+  aplicarFotoInicio(ahora);
   document.body.classList.toggle('hay-promos', combosVisibles(ahora).length > 0);
   if(!grupos.length){
     nav.innerHTML = '';
@@ -1358,41 +1432,116 @@ function textoQuedan(n, conAdmiracion){
   const t = n === 1 ? 'Queda 1' : 'Quedan ' + n;
   return conAdmiracion ? '¡' + t + '!' : t;
 }
-// Lo máximo que se puede llevar de un producto: 10, o lo que queda si quedan 3 o menos.
+/* ---------- Combos como UN solo ítem del carrito ----------
+   Un combo se guarda en el carrito con la clave 'combo|<nombre de la promo>|<id1>|<id2>…'
+   y su cantidad. Así el pedido dice "Spider + collar Starboy (White Spider + Starboy) —
+   S/89" y los productos de adentro cuentan para el stock ("Queda 1"). Si la promo
+   vence, se convierte solo en sus productos sueltos a precio normal. */
+const COMBO_PREFIJO = 'combo|';
+const esClaveCombo = k => String(k).indexOf(COMBO_PREFIJO) === 0;
+const claveCombo = (pr, ids) => COMBO_PREFIJO + pr.nombre + '|' + ids.join('|');
+function leerCombo(k){
+  const partes = String(k).split('|');
+  const ids = partes.slice(2);
+  return {pr: PROMOS.find(p => p.nombre === partes[1]) || null, ids: ids, ps: ids.map(id => POR_ID[id])};
+}
+// Cuántas unidades de un producto hay en el carrito, sueltas y dentro de combos.
+function unidadesDe(id){
+  let n = carrito[id] || 0;
+  Object.keys(carrito).forEach(k => {
+    if(esClaveCombo(k)) n += leerCombo(k).ids.filter(x => x === id).length * carrito[k];
+  });
+  return n;
+}
+// Lo máximo que se puede llevar EN TOTAL de un producto: 10, o lo que queda si quedan 3 o menos.
 function maxDe(id){
   const p = POR_ID[id];
   return p && p.quedan ? Math.min(CANT_MAX, p.quedan) : CANT_MAX;
 }
-function setCantidad(id, n){
-  const tope = maxDe(id);
-  if(n > tope && POR_ID[id] && POR_ID[id].quedan) toast(tope === 1 ? 'Solo queda 1 de este producto' : 'Solo quedan ' + tope + ' de este producto');
+// Lo máximo que puede valer esa línea del carrito (producto suelto o combo), contando
+// lo que ya está en otras líneas.
+function topeLinea(k){
+  if(esClaveCombo(k)){
+    const ids = leerCombo(k).ids, cuenta = {};
+    ids.forEach(id => { cuenta[id] = (cuenta[id] || 0) + 1; });
+    let tope = CANT_MAX;
+    Object.keys(cuenta).forEach(id => {
+      if(!POR_ID[id]) return;
+      const otros = unidadesDe(id) - cuenta[id] * (carrito[k] || 0);
+      tope = Math.min(tope, Math.floor((maxDe(id) - otros) / cuenta[id]));
+    });
+    return Math.max(0, tope);
+  }
+  const enCombos = unidadesDe(k) - (carrito[k] || 0);
+  return Math.max(0, maxDe(k) - enCombos);
+}
+function setCantidad(k, n){
+  const tope = topeLinea(k);
+  if(n > tope && tope < CANT_MAX){
+    toast(esClaveCombo(k)
+      ? (tope === 0 ? 'Ya no quedan unidades para otro combo igual' : 'Solo quedan ' + tope + ' de este combo')
+      : (tope === 0 ? 'Ya no queda más de este producto' : tope === 1 ? 'Solo queda 1 de este producto' : 'Solo quedan ' + tope + ' de este producto'));
+  }
   n = Math.max(0, Math.min(tope, n));
-  if(n === 0) delete carrito[id]; else carrito[id] = n;
+  if(n === 0) delete carrito[k]; else carrito[k] = n;
   guardarCarrito();
   renderContador();
 }
 // Si el stock bajó mientras el carrito estaba guardado, se baja a lo que queda.
 function ajustarCarritoAStock(){
   let cambio = false;
-  Object.keys(carrito).forEach(id => {
-    const tope = maxDe(id);
-    if(POR_ID[id] && carrito[id] > tope){ carrito[id] = tope; cambio = true; }
+  Object.keys(carrito).forEach(k => {
+    if(esClaveCombo(k)){
+      const c = leerCombo(k);
+      if(!c.ps.every(Boolean)) return;
+    } else if(!POR_ID[k]) return;
+    const tope = topeLinea(k);
+    if(carrito[k] > tope){ if(tope > 0) carrito[k] = tope; else delete carrito[k]; cambio = true; }
   });
   if(cambio){ guardarCarrito(); renderContador(); }
+}
+// Cuando una promo vence (o se borra o se apaga), el combo del carrito se convierte
+// en sus productos sueltos: vuelven solos a su precio normal.
+let PROMOS_LISTAS = false;   // ¿ya se leyó promos.csv? (si no, no se toca nada)
+function deshacerCombosVencidos(ahora){
+  if(!PROMOS_LISTAS || !PRODUCTOS.length) return;
+  let cambio = false;
+  Object.keys(carrito).forEach(k => {
+    if(!esClaveCombo(k)) return;
+    const c = leerCombo(k);
+    if(c.pr && promoActiva(c.pr, ahora)) return;
+    c.ids.forEach(id => { carrito[id] = (carrito[id] || 0) + carrito[k]; });
+    delete carrito[k];
+    cambio = true;
+  });
+  if(cambio){ guardarCarrito(); ajustarCarritoAStock(); }
 }
 function agregar(id){
   // Doble candado: el botón ya sale deshabilitado, pero un agotado tampoco
   // entra al carrito por ningún otro camino.
   if(!sePuedePedir(POR_ID[id])) return false;
-  if((carrito[id] || 0) >= maxDe(id)){ setCantidad(id, (carrito[id] || 0) + 1); return false; }
+  if((carrito[id] || 0) >= topeLinea(id)){ setCantidad(id, (carrito[id] || 0) + 1); return false; }
   setCantidad(id, (carrito[id] || 0) + 1);
   contar('carrito/' + id, 'Agregó al carrito: ' + POR_ID[id].nombre);
   return true;
 }
-// Líneas que sí van en el pedido: producto que existe y está disponible.
+// Líneas que sí van en el pedido: producto que existe y está disponible, o combo
+// vigente cuyos productos están todos disponibles. Un combo es UNA línea con el
+// precio de la promo (l.combo = la promo, l.ps = sus productos, l.normal = lo que
+// costaría sin promo).
 function lineasValidas(ahora){
-  return Object.keys(carrito).filter(id => sePuedePedir(POR_ID[id])).map(id => {
-    const p = POR_ID[id], cant = carrito[id], unit = precioVigente(p, ahora);
+  deshacerCombosVencidos(ahora);
+  return Object.keys(carrito).filter(k => {
+    if(!esClaveCombo(k)) return sePuedePedir(POR_ID[k]);
+    const c = leerCombo(k);
+    return !!c.pr && c.ps.every(sePuedePedir);
+  }).map(k => {
+    if(esClaveCombo(k)){
+      const c = leerCombo(k), cant = carrito[k], unit = c.pr.valor;
+      return {combo: c.pr, ps: c.ps, key: k, p: c.ps[0], cant: cant, unit: unit, sub: unit * cant,
+              normal: c.ps.reduce((a, p) => a + precioVigente(p, ahora), 0), oferta: false};
+    }
+    const p = POR_ID[k], cant = carrito[k], unit = precioVigente(p, ahora);
     return {p: p, cant: cant, unit: unit, sub: unit * cant, oferta: ofertaActiva(p, ahora)};
   });
 }
@@ -1405,13 +1554,14 @@ function renderContador(){
 
 // Basta UN producto marcado con EnvioGratis para que todo el pedido vaya con
 // envío gratis (regla de Alberto: "si llevas ese producto, el envío es gratis").
-function pedidoConEnvioGratis(lineas){ return lineas.some(l => l.p.envioGratis); }
+function pedidoConEnvioGratis(lineas){ return lineas.some(l => (l.combo ? l.ps : [l.p]).some(p => p.envioGratis)); }
 
 // Todo lo que muestra el carrito y lleva el mensaje: productos, promos y envío.
 function calcularPedido(ahora){
   const lineas = lineasValidas(ahora);
   const subtotal = centavos(lineas.reduce((a, l) => a + l.sub, 0));
-  const pr = aplicarPromos(lineas, ahora);
+  // Los combos ya traen su precio de promo: no entran a las demás promos.
+  const pr = aplicarPromos(lineas.filter(l => !l.combo), ahora);
   const productos = centavos(subtotal - pr.total);
   const gratis = pedidoConEnvioGratis(lineas);
   const envio = (cfg.ENVIOS || []).find(x => x.id === envioSel) || null;
@@ -1426,8 +1576,12 @@ function textoPedido(){
   const ped = calcularPedido(Date.now());
   const y = cfg.YAPE || {};
   let t = '¡Hola Timeless! Quiero hacer este pedido:\n\n' +
-    ped.lineas.map(l => '• ' + l.cant + ' × ' + l.p.nombre + ' — ' + fmtPrecio(l.unit) +
-      (l.cant > 1 ? ' c/u' : '') + (l.oferta ? ' (oferta)' : '')).join('\n');
+    ped.lineas.map(l => l.combo
+      // Combo: nombre de la promo, lo que eligió y el precio de la promo.
+      ? '• ' + l.cant + ' × ' + l.combo.nombre + ' (' + l.ps.map(p => p.nombre).join(' + ') + ') — ' + fmtPrecio(l.unit) +
+        ' precio promo' + (l.cant > 1 ? ' c/u' : '') + (l.normal > l.unit ? ' (antes ' + fmtPrecio(l.normal) + ')' : '')
+      : '• ' + l.cant + ' × ' + l.p.nombre + ' — ' + fmtPrecio(l.unit) +
+        (l.cant > 1 ? ' c/u' : '') + (l.oferta ? ' (oferta)' : '')).join('\n');
   if(ped.promos.length){
     t += '\n\nPromos aplicadas:\n' + ped.promos.map(x => '• ' + x.promo.nombre +
       (x.veces > 1 ? ' (×' + x.veces + ')' : '') + ': −' + fmtPrecio(x.monto)).join('\n');
@@ -1568,7 +1722,7 @@ function renderFicha(indice){
         ? (enCarrito
           ? '<div class="cant-ficha"><button type="button" data-ficha-cant="-1" aria-label="Quitar uno">−</button>' +
             '<span><b>' + enCarrito + '</b> en tu carrito</span>' +
-            '<button type="button" data-ficha-cant="1" aria-label="Agregar uno"' + (enCarrito >= maxDe(p.id) ? ' disabled' : '') + '>+</button></div>' +
+            '<button type="button" data-ficha-cant="1" aria-label="Agregar uno"' + (enCarrito >= topeLinea(p.id) ? ' disabled' : '') + '>+</button></div>' +
             '<div class="en-carrito">' + (enCarrito > 1 ? 'Más de 1 unidad: sujeto a disponibilidad. ' : '') + '<a href="#/carrito">Ver carrito</a></div>'
           : '<button type="button" class="btn btn-primario" data-agregar="' + esc(p.id) + '">Agregar al carrito</button>')
         : '<div id="avisoFicha">' + avisoHTML(p) + '</div>') +
@@ -1894,7 +2048,7 @@ function renderCarrito(){
 
   if(pasoCarrito === 'canal'){
     body.innerHTML = '<div class="sheet-pad">' +
-      '<h2>Cerrar pedido</h2>' +
+      '<h2>Hacer pedido</h2>' +
       '<p class="pregunta">¿Coordinamos por WhatsApp o por Instagram?</p>' +
       '<p class="nota-chica">Te respondemos por el chat que elijas para confirmar stock y tu envío. Si justo algo se agotó, te avisamos ahí.</p>' +
       notaReintentoHTML() +
@@ -1944,6 +2098,27 @@ function renderCarrito(){
 
   const filas = ids.map(id => {
     const p = POR_ID[id], cant = carrito[id];
+    // Combo: UNA fila con el precio de la promo y lo que eligió el cliente.
+    if(esClaveCombo(id)){
+      const c = leerCombo(id), ok = !!c.pr && c.ps.every(sePuedePedir);
+      if(!ok){
+        return '<div class="linea fuera">' +
+          '<img src="' + esc(c.pr && c.pr.foto ? c.pr.foto : FOTO_VACIA) + '" alt="">' +
+          '<div><div class="linea-nombre">' + esc(c.pr ? c.pr.nombre : 'Promo que ya terminó') + '</div>' +
+          '<div class="linea-sub">Se agotó algo del combo: no se incluye en el pedido</div></div>' +
+          '<div class="linea-der"><button type="button" class="btn-link" data-quitar="' + esc(id) + '">Quitar</button></div></div>';
+      }
+      const normal = c.ps.reduce((a, q) => a + precioVigente(q, ahora), 0);
+      return '<div class="linea linea-combo">' +
+        '<img src="' + esc(c.pr.foto || fotoPropia(c.ps[0])) + '" alt="">' +
+        '<div><div class="linea-nombre">' + esc(c.pr.nombre) + '</div>' +
+        '<div class="linea-sub">' + esc(c.ps.map(q => q.nombre).join(' + ')) + '</div>' +
+        '<div class="linea-sub">' + fmtPrecio(c.pr.valor) + ' promo' + (normal > c.pr.valor ? ' · <s class="tachado">' + fmtPrecio(normal) + '</s>' : '') + (cant > 1 ? ' c/u' : '') + '</div></div>' +
+        '<div class="linea-der"><div class="linea-total">' + fmtPrecio(c.pr.valor * cant) + '</div>' +
+        '<div class="cant"><button type="button" data-cant="-1" data-id="' + esc(id) + '" aria-label="Quitar uno">−</button>' +
+        '<span>' + cant + '</span>' +
+        '<button type="button" data-cant="1" data-id="' + esc(id) + '" aria-label="Agregar uno"' + (cant >= topeLinea(id) ? ' disabled' : '') + '>+</button></div></div></div>';
+    }
     if(!sePuedePedir(p)){
       // Estaba en el carrito y se agotó (o salió del catálogo): se avisa y no entra al pedido.
       return '<div class="linea fuera">' +
@@ -1960,7 +2135,7 @@ function renderCarrito(){
       '<div class="linea-der"><div class="linea-total">' + fmtPrecio(unit * cant) + '</div>' +
       '<div class="cant"><button type="button" data-cant="-1" data-id="' + esc(id) + '" aria-label="Quitar uno">−</button>' +
       '<span>' + cant + '</span>' +
-      '<button type="button" data-cant="1" data-id="' + esc(id) + '" aria-label="Agregar uno"' + (cant >= maxDe(id) ? ' disabled' : '') + '>+</button></div>' +
+      '<button type="button" data-cant="1" data-id="' + esc(id) + '" aria-label="Agregar uno"' + (cant >= topeLinea(id) ? ' disabled' : '') + '>+</button></div>' +
       (p.quedan ? '<div class="linea-quedan">' + textoQuedan(p.quedan, true) + '</div>' : '') + '</div></div>';
   }).join('');
 
@@ -1998,7 +2173,7 @@ function renderCarrito(){
       : '') +
     '<p class="nota-chica">El costo de envío es aproximado y se confirma por chat. Solo enviamos dentro del Perú. En cualquier opción también puedes pagar todo por adelantado.</p>' +
     (validas.length
-      ? '<button type="button" class="btn btn-primario" data-paso="canal">Cerrar pedido</button>'
+      ? '<button type="button" class="btn btn-primario" data-paso="canal">Hacer pedido</button>'
       : '<button type="button" class="btn" disabled>No hay productos disponibles en tu carrito</button>') +
     '<button type="button" class="btn-link" data-vaciar>Vaciar carrito</button>' +
     '</div>';
@@ -2230,6 +2405,7 @@ function calcFirma(ahora){
 setInterval(() => {
   renderFranja();
   const ahora = Date.now();
+  aplicarFotoInicio(ahora);
   const firma = calcFirma(ahora);
   if(firma !== firmaOfertas){
     firmaOfertas = firma;
