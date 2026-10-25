@@ -156,7 +156,10 @@ const CATALOGO_CONFIG = {
   // Ejemplo (se agrega cuando el banner esté listo):
   //   {desde: '2026-10-25 00:00', hasta: '2026-10-31 23:59', foto: 'img/promos/hero-halloween.jpg'},
   //   {desde: '2026-11-01 00:00', hasta: '2026-11-0X 23:59', foto: 'img/promos/hero-cyberwow.jpg'},
-  HERO_FOTOS: [],
+  HERO_FOTOS: [
+    {desde: '2026-10-25 00:00', hasta: '2026-10-31 23:59',
+     foto: 'img/promos/hero-halloween-pc.jpg', fotoCel: 'img/promos/hero-halloween-cel.jpg'},
+  ],
 
   // Líneas dentro de una categoría (columna "Linea" de la hoja). Se muestran como
   // etiqueta en la tarjeta (con esta descripción al pasar el cursor) y en la ficha.

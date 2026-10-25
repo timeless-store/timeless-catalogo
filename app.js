@@ -904,27 +904,38 @@ function renderHeroPromo(ahora){
    tiene su banner en la portada SOLO entre sus fechas; fuera de ellas vuelve la foto
    de siempre (img/inicio.jpg). Si la imagen no carga, se queda la de siempre. */
 const HERO_FOTO_NORMAL = 'img/inicio.jpg';
-let heroFotoActual = HERO_FOTO_NORMAL;
+let heroFotoActual = HERO_FOTO_NORMAL, heroCargando = '';
+// Cada entrada puede traer "foto" (PC) y "fotoCel" (celular); si falta una, se usa la otra.
 function fotoDelInicio(ahora){
   const lista = cfg.HERO_FOTOS || [];
+  const esPC = window.matchMedia ? matchMedia('(min-width:760px)').matches : true;
   for(let i = 0; i < lista.length; i++){
     const f = lista[i], d = parseFechaLima(f.desde), h = parseFechaLima(f.hasta);
-    if(!f.foto || isNaN(d) || isNaN(h)) continue;
+    const foto = esPC ? (f.foto || f.fotoCel) : (f.fotoCel || f.foto);
+    if(!foto || isNaN(d) || isNaN(h)) continue;
     // En la página de pruebas (VER_PROMOS_ANTES) se ve la primera aunque no haya llegado la fecha.
-    if(cfg.VER_PROMOS_ANTES ? ahora < h : (d === null || ahora >= d) && (h === null || ahora < h)) return f.foto;
+    if(cfg.VER_PROMOS_ANTES ? ahora < h : (d === null || ahora >= d) && (h === null || ahora < h)) return foto;
   }
   return HERO_FOTO_NORMAL;
 }
 function aplicarFotoInicio(ahora){
   const quiere = fotoDelInicio(ahora);
-  if(quiere === heroFotoActual) return;
-  const poner = ruta => document.querySelectorAll('.hero-foto, .hero-foto-fondo').forEach(img => { img.src = ruta; });
-  if(quiere === HERO_FOTO_NORMAL){ heroFotoActual = quiere; poner(quiere); return; }
+  if(quiere === heroFotoActual || quiere === heroCargando) return;
+  const poner = ruta => {
+    heroFotoActual = ruta; heroCargando = '';
+    document.querySelectorAll('.hero-foto, .hero-foto-fondo').forEach(img => { img.src = ruta; });
+    // Con banner de campaña la portada se acomoda para que se vea completo (ver .hero-campana).
+    const hero = document.querySelector('.hero');
+    if(hero) hero.classList.toggle('hero-campana', ruta !== HERO_FOTO_NORMAL);
+  };
+  if(quiere === HERO_FOTO_NORMAL){ poner(quiere); return; }
+  heroCargando = quiere;
   const prueba = new Image();
-  prueba.onload = () => { heroFotoActual = quiere; poner(quiere); };
-  prueba.onerror = () => {};   // no existe o no cargó: se queda la foto de siempre
+  prueba.onload = () => poner(quiere);
+  prueba.onerror = () => { heroCargando = ''; };   // no existe o no cargó: se queda la foto de siempre
   prueba.src = quiere;
 }
+aplicarFotoInicio(Date.now());   // ya al abrir (sin esperar a los productos), para que no parpadee la foto de siempre
 
 function renderGrilla(){
   const ahora = Date.now();
@@ -1647,6 +1658,16 @@ function indiceGaleria(){
   return pista && pista.clientWidth ? Math.round(pista.scrollLeft / pista.clientWidth) : 0;
 }
 
+// Cinturón: la gente cree que cada talla de pantalón es un cinturón distinto. Se explica
+// que es UN solo cinturón para varias tallas. Lee "28–40 aprox. (79–102cm de cintura)";
+// si el texto no tiene esa forma, se muestra tal cual.
+function tallasCinturonHTML(t){
+  const m = String(t || '').match(/^\s*(\d+)\s*[–-]\s*(\d+)\s*(?:aprox\.?)?\s*(?:\(\s*(\d+)\s*[–-]\s*(\d+)\s*cm[^)]*\))?/i);
+  if(!m) return esc(t);
+  return '<b>Sirve para las tallas ' + m[1] + ' a ' + m[2] + '</b> <span class="aprox">(aprox.)</span>' +
+    '<span class="nota-316">Es UN solo cinturón para todas esas tallas: no tienes que elegir talla.' +
+    (m[3] ? ' Cintura de ' + m[3] + ' a ' + m[4] + ' cm.' : '') + '</span>';
+}
 function renderFicha(indice){
   const e = ENTRADA_POR_ID[fichaEntradaId];
   const p = POR_ID[fichaVarId];
@@ -1704,7 +1725,7 @@ function renderFicha(indice){
         // En cinturones la talla es la del pantalón (así está en el Canva), con
         // una "?" que explica cómo medirse; en el resto, "Tallas" a secas.
         (esCinturon && p.tallas
-          ? '<div class="dato"><dt>Tallas de pantalón ' + infoHTML('¿Cómo saber tu talla?', '<b>¿Cómo saber tu talla?</b>' + guia) + '</dt><dd>' + esc(p.tallas) + '</dd></div>'
+          ? '<div class="dato"><dt>Tallas de pantalón ' + infoHTML('¿Cómo saber tu talla?', '<b>¿Cómo saber tu talla?</b>' + guia) + '</dt><dd>' + tallasCinturonHTML(p.tallas) + '</dd></div>'
           : dato('Tallas', p.tallas)) +
         (p.material
           ? '<div class="dato"><dt>Material</dt><dd>' + esc(p.material) +

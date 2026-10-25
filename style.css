@@ -1433,3 +1433,33 @@ html.sin-scroll{overflow:hidden;}
 .nota-reintento{margin:12px 0;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:13px;line-height:1.5;color:var(--muted);}
 .nota-reintento b{color:var(--bone);}
 
+
+/* Portada con banner de campaña (config.js, HERO_FOTOS): la imagen se ve ENTERA.
+   Celular: el banner cuadrado arriba (casi sin desvanecer) y el texto debajo.
+   PC: el banner cuadrado a la izquierda, fundido con el oscuro por la derecha. */
+.hero.hero-campana{padding-top:0;}
+.hero.hero-campana::before{content:"";display:block;padding-top:calc(100% + 40px);}
+.hero.hero-campana .hero-foto-fondo{display:none;}
+.hero.hero-campana .hero-foto{
+  left:0;right:0;top:0;
+  width:100%;height:auto;
+  aspect-ratio:1/1;
+  object-fit:cover;
+  -webkit-mask-image:linear-gradient(180deg,#000 90%,transparent 100%);
+  mask-image:linear-gradient(180deg,#000 90%,transparent 100%);
+}
+.hero.hero-campana .hero-eyebrow{margin-top:-6px;}
+@media (min-width:760px){
+  .hero.hero-campana{padding:34px 28px 28px 50%;}
+  .hero.hero-campana::before{display:none;}
+  .hero.hero-campana .hero-foto{
+    right:auto;bottom:0;left:0;
+    width:52%;height:100%;
+    aspect-ratio:auto;
+    object-fit:contain;
+    object-position:left center;
+    -webkit-mask-image:linear-gradient(90deg,#000 80%,transparent 100%);
+    mask-image:linear-gradient(90deg,#000 80%,transparent 100%);
+  }
+  .hero.hero-campana .hero-eyebrow{margin-top:0;}
+}
