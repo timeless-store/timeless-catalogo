@@ -115,6 +115,11 @@ const CATALOGO_CONFIG = {
   // la página muestra el aviso de "falta el formulario".
   LIBRO_RECLAMACIONES_FORM: 'https://forms.gle/Pdt3bpxdMpRHXtVGA',
 
+  // Píxel de Meta (para medir anuncios). Es el número del píxel que sale en el Administrador
+  // de eventos de Meta (15 o 16 dígitos; NO es un secreto). Vacío = no se carga nada.
+  // La página de pruebas lo deja siempre vacío.
+  META_PIXEL_ID: '',
+
   // Estadísticas (GoatCounter, sin cookies): https://timeless.goatcounter.com
   // Vacío = no se cuenta nada.
   GOATCOUNTER: 'timeless',
@@ -140,11 +145,11 @@ const CATALOGO_CONFIG = {
   // Título y subtítulo de la sección de promos de ESTA campaña (Halloween, 25 al
   // 31 de octubre de 2026). Al terminar la campaña: dejarlos vacíos ('') para volver
   // al título "Promociones" de siempre.
-  PROMOS_TITULO: 'Vuelven las promos Spider 🕷️ · edición Halloween',
+  PROMOS_TITULO: 'Vuelven las promos Spider 🕷️ · Edición Halloween',
   PROMOS_ETIQUETA: 'PROMOS HALLOWEEN',          // arriba del título al abrir un combo (vacío = "Promoción")
   PROMOS_HERO: '🎃 PROMOS HALLOWEEN',            // botón grande del inicio (vacío = "🔥 Promos disponibles")
   PROMOS_HERO_SUB: 'Combos Spider desde S/89',    // primera parte de la línea de abajo del botón (vacío = solo la fecha)
-  PROMOS_SUBTITULO: 'Envío gratis en estos combos · Lima: pide hasta el jueves 29 · Provincia: hasta el martes 27 para que llegue antes de Halloween',
+  PROMOS_SUBTITULO: 'Envío gratis en estos combos · Lima: el delivery demora 1 día, pide hasta el viernes 30 para que llegue el 31 · Provincia: Shalom demora de 1 a 3 días, pide hasta el miércoles 28 para que llegue antes de Halloween',
 
   // Solo para la página de PRUEBAS: muestra las promos aunque todavía no llegue su
   // fecha de inicio ("Desde" en promos.csv). En el catálogo real va en false.

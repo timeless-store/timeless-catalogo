@@ -474,6 +474,28 @@ document.addEventListener('click', e => {
   if(el) contar(el.dataset.contar, el.textContent.trim());
 });
 
+/* ---------- Píxel de Meta (para medir los anuncios) ----------
+   Solo se activa si config.js trae META_PIXEL_ID (un número). Manda ÚNICAMENTE eventos
+   de la tienda: página vista, producto visto, agregado al carrito, "Hacer pedido" y
+   pedido enviado (con el monto). NUNCA manda nombre, teléfono, distrito ni dirección. */
+let pixelActivo = false;
+function iniciarPixel(){
+  const id = String(cfg.META_PIXEL_ID || '').trim();
+  if(!/^\d{8,20}$/.test(id)) return;
+  try{
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    window.fbq('init', id);
+    window.fbq('track', 'PageView');
+    pixelActivo = true;
+    const aviso = document.getElementById('pixelAviso');
+    if(aviso) aviso.hidden = false;
+  }catch(e){}
+}
+function pixel(evento, datos){
+  try{ if(pixelActivo && window.fbq) window.fbq('track', evento, datos || {}); }catch(e){}
+}
+iniciarPixel();
+
 /* ---------- Carga de datos ---------- */
 const PROMOS_KEY = 'timeless_catalogo_promos';
 function fetchCSV(url){
@@ -864,6 +886,7 @@ document.getElementById('comboBody').addEventListener('click', e => {
       setCantidad(k, antes + 1);
       if((carrito[k] || 0) > antes){
         contar('combo/' + i, 'Agregó combo: ' + pr.nombre);
+        pixel('AddToCart', {content_ids: ids, content_name: pr.nombre, content_type: 'product', value: pr.valor, currency: 'PEN'});
         toast('Combo agregado al carrito');
         location.hash = '#/carrito';
       }
@@ -1534,6 +1557,7 @@ function agregar(id){
   if((carrito[id] || 0) >= topeLinea(id)){ setCantidad(id, (carrito[id] || 0) + 1); return false; }
   setCantidad(id, (carrito[id] || 0) + 1);
   contar('carrito/' + id, 'Agregó al carrito: ' + POR_ID[id].nombre);
+  pixel('AddToCart', {content_ids: [id], content_name: POR_ID[id].nombre, content_type: 'product', value: precioVigente(POR_ID[id], Date.now()), currency: 'PEN'});
   return true;
 }
 // Líneas que sí van en el pedido: producto que existe y está disponible, o combo
@@ -2299,11 +2323,16 @@ document.getElementById('carritoBody').addEventListener('click', e => {
   if(t.closest('[data-vaciar-listo]')){ carrito = {}; guardarCarrito(); renderContador(); pasoCarrito = 'lista'; toast('Listo, tu carrito quedó vacío'); renderCarrito(); return; }
   if(t.closest('[data-vaciar]')){ carrito = {}; guardarCarrito(); renderContador(); renderCarrito(); return; }
   const paso = t.closest('[data-paso]');
-  if(paso){ pasoCarrito = paso.dataset.paso; renderCarrito(); return; }
+  if(paso){
+    pasoCarrito = paso.dataset.paso;
+    if(pasoCarrito === 'canal'){ const pd = calcularPedido(Date.now()); pixel('InitiateCheckout', {value: pd.productos, currency: 'PEN', num_items: pd.lineas.reduce((a, l) => a + l.cant, 0)}); }
+    renderCarrito(); return;
+  }
   const canal = t.closest('[data-canal]');
   if(canal){
     const texto = textoPedido();
     contar('cerrar-pedido/' + canal.dataset.canal, 'Cerró pedido por ' + canal.dataset.canal);
+    pixel('Lead', {value: calcularPedido(Date.now()).productos, currency: 'PEN', content_category: canal.dataset.canal});
     if(canal.dataset.canal === 'whatsapp'){
       window.open(urlWhatsApp(texto), '_blank', 'noopener');
       pasoCarrito = 'enviado'; renderCarrito();
@@ -2336,6 +2365,7 @@ function ruta(){
         fichaEntradaId = e.id;
         fichaVarId = (clave !== e.id && POR_ID[clave]) ? clave : repVariante(e).id;
         contar('producto/' + fichaVarId, 'Vio: ' + POR_ID[fichaVarId].nombre);
+        pixel('ViewContent', {content_ids: [fichaVarId], content_name: POR_ID[fichaVarId].nombre, content_type: 'product', value: precioVigente(POR_ID[fichaVarId], Date.now()), currency: 'PEN'});
         indiceNuevo = POR_ID[fichaVarId].indiceFoto;
       } else {
         indiceNuevo = indiceGaleria();   // repintado (ej. venció una oferta): se queda donde estaba
