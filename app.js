@@ -997,12 +997,12 @@ function renderGrilla(){
     const verAgotados = !ocultarAgotados[g.id];
     return '<section class="cat" id="' + esc(g.id) + '">' +
       '<h2 class="cat-titulo">' + esc(g.nombre) + ' <span class="cat-cuenta">' + g.items.length + '</span></h2>' +
-      // Filtro: "En stock" siempre activo (verde); "Agotados" (rojo) se puede apagar
-      // y entonces dice "Ver agotados" y los agotados no se muestran.
+      // Filtro: "En stock" siempre activo (verde); "Ocultar agotados" (rojo) los esconde
+      // y entonces el botón dice "Ver agotados" para volver a mostrarlos.
       (hayAgotados
         ? '<div class="filtro-stock"><span class="filtro filtro-stock-on">En stock</span>' +
           '<button type="button" class="filtro ' + (verAgotados ? 'filtro-agot-on' : 'filtro-agot-off') + '" data-agotados="' + esc(g.id) + '" aria-pressed="' + verAgotados + '">' +
-          (verAgotados ? 'Agotados' : 'Ver agotados') + '</button></div>'
+          (verAgotados ? 'Ocultar agotados' : 'Ver agotados') + '</button></div>'
         : '') +
       '<div class="grilla">' + g.items.filter(e => verAgotados || e.disponible).map(e => tarjetaHTML(e, ahora)).join('') + '</div>' +
       // "¿No sabes si te queda?" solo donde hay talla: cinturones y anillos.
