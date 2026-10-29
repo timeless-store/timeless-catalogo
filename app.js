@@ -945,15 +945,16 @@ function renderHeroDrop(ahora){
   });
   el.innerHTML = html;
 }
-// "Volvieron los anillos Duki": ocupa el primer botoncito del inicio mientras haya stock.
+// "Volvieron los anillos Duki 🖤": botoncito extra del inicio, hasta la fecha o mientras haya stock.
 function renderChipAviso(){
-  const li = document.getElementById('chipPrimero');
+  const li = document.getElementById('chipAviso');
   const a = cfg.AVISO_CHIP;
   if(!li || !a) return;
   const p = PRODUCTOS.find(x => x.nombre === a.producto);
-  li.innerHTML = p && p.disponible && p.visible
-    ? '<a href="#catalogo" data-scroll="cat-' + slug(p.categoria) + '">' + esc(a.texto) + '</a>'
-    : '<a href="#envios" data-scroll="envios">Puntos de recojo sin costo</a>';
+  const hasta = parseFechaLima(a.hasta);
+  const vigente = p && p.disponible && p.visible && !(hasta && Date.now() > hasta);
+  li.hidden = !vigente;
+  li.innerHTML = vigente ? '<a href="#catalogo" data-scroll="cat-' + slug(p.categoria) + '">' + esc(a.texto) + '</a>' : '';
 }
 function renderHeroPromo(ahora){
   const el = document.getElementById('heroPromo');

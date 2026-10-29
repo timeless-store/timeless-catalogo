@@ -174,9 +174,9 @@ const CATALOGO_CONFIG = {
     'Cinturón Black Cross Deluxe': {desde: '2026-10-29 18:00', hasta: '2026-11-05 23:59'},
   },
 
-  // Aviso en el primer botoncito del inicio (donde dice "Puntos de recojo sin costo").
-  // Sale solo mientras el producto esté disponible; si no, vuelve el botón de siempre.
-  AVISO_CHIP: {producto: 'Anillos Demon & Angel Wings Duki', texto: 'Volvieron los anillos Duki'},
+  // Botoncito extra al inicio de los avisos del inicio (antes de "Puntos de recojo sin costo").
+  // Sale solo hasta "hasta" y mientras el producto esté disponible.
+  AVISO_CHIP: {producto: 'Anillos Demon & Angel Wings Duki', texto: 'Volvieron los anillos Duki 🖤', hasta: '2026-11-05 23:59'},
 
   // Líneas dentro de una categoría (columna "Linea" de la hoja). Se muestran como
   // etiqueta en la tarjeta (con esta descripción al pasar el cursor) y en la ficha.
