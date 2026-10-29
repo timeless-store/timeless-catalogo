@@ -174,9 +174,9 @@ const CATALOGO_CONFIG = {
     'Cinturón Black Cross Deluxe': {desde: '2026-10-29 18:00', hasta: '2026-11-05 23:59'},
   },
 
-  // Cinturones con el texto nuevo de tallas ("Entra en cinturas de X a Y cm. Es UN solo
-  // cinturón que agarra esas tallas…"). Cuando Alberto lo pida, se pasa a todos.
-  TALLAS_TEXTO_NUEVO: ['Cinturón Black Cross Deluxe'],
+  // Aviso en el primer botoncito del inicio (donde dice "Puntos de recojo sin costo").
+  // Sale solo mientras el producto esté disponible; si no, vuelve el botón de siempre.
+  AVISO_CHIP: {producto: 'Anillos Demon & Angel Wings Duki', texto: 'Volvieron los anillos Duki'},
 
   // Líneas dentro de una categoría (columna "Linea" de la hoja). Se muestran como
   // etiqueta en la tarjeta (con esta descripción al pasar el cursor) y en la ficha.

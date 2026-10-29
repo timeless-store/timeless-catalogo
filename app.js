@@ -664,7 +664,7 @@ function etiquetasHTML(e){
   const out = [];
   const l = lineaDe(e);
   if(l) out.push('<span class="etq etq-linea"' + (l.descripcion ? ' data-tip="' + esc(l.descripcion) + '"' : '') + '>' + esc(l.titulo) + '</span>');
-  if(/^acero inoxidable/i.test(e.material)) out.push('<span class="etq">' + esc(/316l/i.test(e.material) ? 'Acero 316L' : 'Acero inoxidable') + '</span>');
+  if(/^(cadena exterior de )?acero inoxidable/i.test(e.material)) out.push('<span class="etq">' + esc(/316l/i.test(e.material) ? 'Acero 316L' : 'Acero inoxidable') + '</span>');
   if(e.coleccion) out.push('<span class="etq etq-col">' + esc(e.coleccion) + '</span>');
   if(/cajita/i.test(e.empaque || '')) out.push('<span class="etq">Cajita premium</span>');
   return out.length ? '<div class="etqs">' + out.join('') + '</div>' : '';
@@ -932,6 +932,29 @@ function promosSeccionHTML(ahora){
       .sort((a, b) => (b.ok - a.ok) || (a.x.i - b.x.i)).map(c => comboHTML(c.x, ahora)).join('') + '</div></section>';
 }
 // Botón llamativo del inicio cuando hay promos.
+// Aviso del inicio mientras dura un lanzamiento (LANZAMIENTOS en config.js): lleva a Cinturones.
+function renderHeroDrop(ahora){
+  const el = document.getElementById('heroDrop');
+  if(!el) return;
+  let html = '';
+  Object.keys(cfg.LANZAMIENTOS || {}).forEach(nombre => {
+    const l = lanzamientoDe(nombre), p = PRODUCTOS.find(x => x.nombre === nombre);
+    if(html || !l || !p || ahora >= l.hasta || !p.visible) return;
+    html = '<a class="hero-promo hero-drop" href="#catalogo" data-scroll="cat-' + slug(p.categoria) + '"><span class="hero-promo-titulo">🖤 NEW DROP</span>' +
+      '<span class="hero-promo-sub">' + esc(nombre) + ' · ' + (ahora < l.desde ? esc(textoSale(l.desde)) + ' · ' : '') + 'Ver ' + esc(p.categoria.toLowerCase()) + ' →</span></a>';
+  });
+  el.innerHTML = html;
+}
+// "Volvieron los anillos Duki": ocupa el primer botoncito del inicio mientras haya stock.
+function renderChipAviso(){
+  const li = document.getElementById('chipPrimero');
+  const a = cfg.AVISO_CHIP;
+  if(!li || !a) return;
+  const p = PRODUCTOS.find(x => x.nombre === a.producto);
+  li.innerHTML = p && p.disponible && p.visible
+    ? '<a href="#catalogo" data-scroll="cat-' + slug(p.categoria) + '">' + esc(a.texto) + '</a>'
+    : '<a href="#envios" data-scroll="envios">Puntos de recojo sin costo</a>';
+}
 function renderHeroPromo(ahora){
   const el = document.getElementById('heroPromo');
   if(!el) return;
@@ -991,6 +1014,8 @@ function renderGrilla(){
   const nav = document.getElementById('catsNav');
   const grupos = agrupar();
   renderHeroPromo(ahora);
+  renderHeroDrop(ahora);
+  renderChipAviso();
   aplicarFotoInicio(ahora);
   document.body.classList.toggle('hay-promos', combosVisibles(ahora).length > 0);
   if(!grupos.length){
@@ -1031,7 +1056,7 @@ function renderGrilla(){
         : '') +
       '<div class="grilla">' + g.items.filter(e => verAgotados || e.disponible).map(e => tarjetaHTML(e, ahora)).join('') + '</div>' +
       // "¿No sabes si te queda?" solo donde hay talla: cinturones y anillos.
-      (CON_TALLA.indexOf(norm(g.nombre)) > -1 ? fraseTallaHTML(null) : '') +
+      (CON_TALLA.indexOf(norm(g.nombre)) > -1 ? fraseTallaHTML(norm(g.nombre), false) : '') +
       '</section>';
   }).join('');
   marcarCargadas(main);
@@ -1443,9 +1468,13 @@ function fechaBonita(v){
 // "¿No sabes si te queda? Escríbenos por DM…": "Escríbenos por DM" es un botón
 // que deja elegir WhatsApp (con el mensaje ya escrito) o Instagram (se copia y
 // se abre el chat). Con producto, el mensaje lo nombra.
-function fraseTallaHTML(producto){
-  return '<div class="frase-talla">¿No sabes si te queda? <button type="button" class="dm-link" data-dm="' + esc(producto || '') + '">Escríbenos por DM</button> y te ayudamos a elegir tu talla' +
-    '<div class="dm-menu" hidden></div></div>';
+// Anillos: son ajustables, solo se avisa desde qué contorno. Cinturones: todos son una sola
+// talla, así que al final de la sección va la guía; en la ficha ya sale la guía, no se repite.
+function fraseTallaHTML(categoria, enFicha){
+  if(categoria === 'anillos') return '<div class="frase-talla">Anillos ajustables: se agrandan desde aprox. 6cm de contorno</div>';
+  if(enFicha) return '';
+  return '<div class="frase-talla frase-guia"><b>¿Cómo saber tu talla?</b>' +
+    (cfg.GUIA_TALLA || []).map(t => '<p>' + esc(t) + '</p>').join('') + '</div>';
 }
 function textoDM(producto){
   return producto ? '¡Hola Timeless! Quiero saber cómo me queda: ' + producto : '¡Hola Timeless! Quiero saber qué talla me queda';
@@ -1714,9 +1743,9 @@ function tallasCinturonHTML(t, nombre){
   const m = String(t || '').match(/^\s*(\d+)\s*[–-]\s*(\d+)\s*(?:aprox\.?)?\s*(?:\(\s*(\d+)\s*[–-]\s*(\d+)\s*cm[^)]*\))?/i);
   if(!m) return esc(t);
   return '<b>Sirve para las tallas ' + m[1] + ' a ' + m[2] + '</b> <span class="aprox">(aprox.)</span>' +
-    '<span class="nota-316">' + (m[3] && (cfg.TALLAS_TEXTO_NUEVO || []).indexOf(nombre) > -1
+    '<span class="nota-316">' + (m[3]
       ? 'Entra en cinturas de ' + m[3] + ' a ' + m[4] + ' cm. Es UN solo cinturón que agarra esas tallas: no tienes que elegir talla.'
-      : 'Es UN solo cinturón para todas esas tallas: no tienes que elegir talla.' + (m[3] ? ' Cintura de ' + m[3] + ' a ' + m[4] + ' cm.' : '')) + '</span>';
+      : 'Es UN solo cinturón para todas esas tallas: no tienes que elegir talla.') + '</span>';
 }
 function renderFicha(indice){
   const e = ENTRADA_POR_ID[fichaEntradaId];
@@ -1797,7 +1826,7 @@ function renderFicha(indice){
             '<div class="en-carrito">' + (enCarrito > 1 ? 'Más de 1 unidad: sujeto a disponibilidad. ' : '') + '<a href="#/carrito">Ver carrito</a></div>'
           : '<button type="button" class="btn btn-primario" data-agregar="' + esc(p.id) + '">Agregar al carrito</button>')
         : '<div id="avisoFicha">' + avisoHTML(p) + '</div>') +
-      (CON_TALLA.indexOf(norm(p.categoria)) > -1 ? fraseTallaHTML(titulo) : '') +
+      (CON_TALLA.indexOf(norm(p.categoria)) > -1 ? fraseTallaHTML(norm(p.categoria), true) : '') +
     '</div>';
   const pista = document.getElementById('galPista');
   if(varias){

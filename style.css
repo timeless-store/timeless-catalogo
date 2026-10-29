@@ -1472,3 +1472,9 @@ html.sin-scroll{overflow:hidden;}
   font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fff;
   text-shadow:0 1px 8px #000;pointer-events:none;
 }
+
+/* Aviso NEW DROP del inicio y guía de talla de cinturones */
+.hero-promo.hero-drop{background:#0b0b0b;border:1px solid #e11d2e;box-shadow:0 0 22px rgba(225,29,46,.45);animation:none;}
+.frase-guia{text-align:left;}
+.frase-guia b{display:block;color:var(--bone);margin-bottom:4px;}
+.frase-guia p{margin:6px 0 0;}
