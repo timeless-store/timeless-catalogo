@@ -187,7 +187,7 @@ const CATALOGO_CONFIG = {
 
   // Orden en que aparecen las categorías. Si en la hoja aparece una categoría
   // que no está en esta lista, igual se muestra, al final.
-  CATEGORIAS: ['Cinturones', 'Collares', 'Pant chains', 'Anillos', 'Lentes'],
+  CATEGORIAS: ['Cinturones', 'Collares', 'Anillos', 'Pant chains', 'Lentes'],
 
   // Frase con la que cierra cada categoría y cada ficha (la misma del Canva).
   FRASE_TALLA: '¿No sabes si te queda? Escríbenos por DM y te ayudamos a elegir tu talla',
