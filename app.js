@@ -234,7 +234,7 @@ function aplicarEstado(productos, filas){
       // Unidades que quedan (1 a 3). Si junta varias filas, la menor de las que traen número.
       const qs = suyas.map(f => f.quedan).filter(n => n >= 1 && n <= 3);
       p.quedan = p.disponible && qs.length ? Math.min.apply(null, qs) : 0;
-      p.restock = est === 'restock en camino';
+      p.restock = est === 'restock en camino' && (cfg.SIN_AVISO_RESTOCK || []).indexOf(p.nombre) === -1;   // SIN_AVISO_RESTOCK: sale como Agotado
       p.proximamente = false;
       p.visible = p.visible && (est !== 'oculto' || p.visibleSi);
     }
@@ -1472,7 +1472,7 @@ function fechaBonita(v){
 // Anillos: son ajustables, solo se avisa desde qué contorno. Cinturones: todos son una sola
 // talla, así que al final de la sección va la guía; en la ficha ya sale la guía, no se repite.
 function fraseTallaHTML(categoria, enFicha){
-  if(categoria === 'anillos') return '<div class="frase-talla">Anillos ajustables: se agrandan desde aprox. 6cm de contorno</div>';
+  if(categoria === 'anillos') return '<div class="frase-talla">Anillos ajustables: se agrandan desde aprox. 6cm de contorno y se amoldan al tamaño de tu dedo</div>';
   if(enFicha) return '';
   return '<div class="frase-talla frase-guia"><b>¿Cómo saber tu talla?</b>' +
     (cfg.GUIA_TALLA || []).map(t => '<p>' + esc(t) + '</p>').join('') + '</div>';

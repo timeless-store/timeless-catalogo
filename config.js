@@ -126,7 +126,7 @@ const CATALOGO_CONFIG = {
 
   // Fotos de clientes con sus pedidos (carrusel "Clientes"). Ej: 'img/clientes/1.jpg'.
   // Vacío = la sección dice "Muy pronto".
-  CLIENTES_FOTOS: ['img/clientes/01.jpg', 'img/clientes/02.jpg', 'img/clientes/03.jpg', 'img/clientes/04.jpg', 'img/clientes/05.jpg', 'img/clientes/06.jpg', 'img/clientes/07.jpg', 'img/clientes/08.jpg', 'img/clientes/09.jpg', 'img/clientes/10.jpg', 'img/clientes/11.jpg', 'img/clientes/12.jpg', 'img/clientes/13.jpg'],
+  CLIENTES_FOTOS: ['img/clientes/01.jpg', 'img/clientes/02.jpg', 'img/clientes/03.jpg', 'img/clientes/04.jpg', 'img/clientes/05.jpg', 'img/clientes/06.jpg', 'img/clientes/07.jpg', 'img/clientes/08.jpg', 'img/clientes/09.jpg', 'img/clientes/10.jpg', 'img/clientes/11.jpg', 'img/clientes/12.jpg', 'img/clientes/13.jpg', 'img/clientes/14.jpg'],
 
   // Ordenar por la velocidad de venta que manda el dashboard (columna Orden).
   // APAGADO: Alberto decide el orden a mano y pide usar este solo cuando él diga.
@@ -173,6 +173,9 @@ const CATALOGO_CONFIG = {
   LANZAMIENTOS: {
     'Cinturón Black Cross Deluxe': {desde: '2026-10-29 18:00', hasta: '2026-11-05 23:59'},
   },
+
+  // Productos que NO muestran "Restock en camino" aunque el dashboard lo diga (salen como Agotado).
+  SIN_AVISO_RESTOCK: ['Pant Chain Chrome Hearts'],
 
   // Botoncito extra al inicio de los avisos del inicio (antes de "Puntos de recojo sin costo").
   // Sale solo hasta "hasta" y mientras el producto esté disponible.
