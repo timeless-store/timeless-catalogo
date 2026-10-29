@@ -166,6 +166,18 @@ const CATALOGO_CONFIG = {
      foto: 'img/promos/hero-halloween-pc.jpg', fotoCel: 'img/promos/hero-halloween-cel.jpg'},
   ],
 
+  // Lanzamientos programados (NEW DROP). El producto debe estar en productos.csv con
+  // Disponible = PRONTO y Visible = SI: antes de "desde" se ve oscuro con las fotos y
+  // "Sale hoy a las 6:00 pm", y a esa hora sale solo (la página se recarga sola).
+  // Hasta "hasta" lleva la etiqueta NEW DROP (vacío = 7 días).
+  LANZAMIENTOS: {
+    'Cinturón Black Cross Deluxe': {desde: '2026-10-29 18:00', hasta: '2026-11-05 23:59'},
+  },
+
+  // Cinturones con el texto nuevo de tallas ("Entra en cinturas de X a Y cm. Es UN solo
+  // cinturón que agarra esas tallas…"). Cuando Alberto lo pida, se pasa a todos.
+  TALLAS_TEXTO_NUEVO: ['Cinturón Black Cross Deluxe'],
+
   // Líneas dentro de una categoría (columna "Linea" de la hoja). Se muestran como
   // etiqueta en la tarjeta (con esta descripción al pasar el cursor) y en la ficha.
   LINEAS: [

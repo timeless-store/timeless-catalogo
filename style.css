@@ -1463,3 +1463,12 @@ html.sin-scroll{overflow:hidden;}
   }
   .hero.hero-campana .hero-eyebrow{margin-top:0;}
 }
+
+/* Lanzamiento programado (NEW DROP): oscuro antes de la hora, con las fotos visibles */
+.tag-drop{background:#e11d2e;color:#fff;box-shadow:0 0 14px rgba(225,29,46,.65);}
+.prod.teaser .prod-foto img{filter:brightness(.4) saturate(.8);}
+.prod-sale{
+  position:absolute;left:8px;right:8px;bottom:10px;text-align:center;
+  font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fff;
+  text-shadow:0 1px 8px #000;pointer-events:none;
+}

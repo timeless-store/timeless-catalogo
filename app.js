@@ -77,6 +77,20 @@ function parseMoney(s){
 // hora): así la oferta vence a la misma medianoche para todos, aunque el
 // celular del cliente esté en otra zona horaria.
 // Devuelve null si está vacía y NaN si está escrita de una forma que no se entiende.
+function lanzamientoDe(nombre){
+  const l = (cfg.LANZAMIENTOS || {})[nombre];
+  if(!l) return null;
+  const desde = parseFechaLima(l.desde), hasta = parseFechaLima(l.hasta);
+  return desde ? {desde: desde, hasta: hasta || desde + 7 * 86400000} : null;
+}
+// "Sale hoy a las 6:00 pm" / "Sale el 30 de octubre a las 6:00 pm" (hora de Lima).
+function textoSale(ms){
+  const d = new Date(ms - 5 * 3600 * 1000), h = d.getUTCHours(), m = d.getUTCMinutes();
+  const hora = ((h % 12) || 12) + ':' + String(m).padStart(2, '0') + ' ' + (h < 12 ? 'am' : 'pm');
+  const hoy = new Date(Date.now() - 5 * 3600 * 1000);
+  const esHoy = hoy.getUTCFullYear() === d.getUTCFullYear() && hoy.getUTCMonth() === d.getUTCMonth() && hoy.getUTCDate() === d.getUTCDate();
+  return 'Sale ' + (esHoy ? 'hoy' : 'el ' + d.getUTCDate() + ' de ' + MESES[d.getUTCMonth()]) + ' a las ' + hora;
+}
 function parseFechaLima(s){
   s = String(s == null ? '' : s).trim();
   if(!s) return null;
@@ -129,7 +143,11 @@ function filasAProductos(rows){
     // RESTOCK = agotado pero ya está pedido ("Restock en camino");
     // PRONTO = producto nuevo que todavía no llega.
     const disp = norm(col(r, 'disponible'));
-    const pronto = ['pronto', 'proximamente', 'proximo'].indexOf(disp) > -1;
+    let pronto = ['pronto', 'proximamente', 'proximo'].indexOf(disp) > -1;
+    // LANZAMIENTOS (config.js): un producto con Disponible = PRONTO sale solo a la hora indicada.
+    // Antes de esa hora se ve su "teaser" (fotos visibles, oscuro, "sale hoy a las 6 pm").
+    const lanz = lanzamientoDe(nombre);
+    if(lanz && pronto && Date.now() >= lanz.desde) pronto = false;
     const restock = ['restock', 'restock en camino', 'en camino'].indexOf(disp) > -1;
     const pocos = ['pocos', 'quedan pocos'].indexOf(disp) > -1;
     // BestSeller: un número es su puesto en "Más vendidos" (1 = primero); SI = al final.
@@ -144,6 +162,8 @@ function filasAProductos(rows){
       // Solo se marca agotado con un NO explícito. Una celda vacía cuenta como disponible.
       disponible: !pronto && !restock && ['no', 'agotado', '0', 'false', 'falso'].indexOf(disp) === -1,
       proximamente: pronto,
+      lanzamiento: lanz && pronto ? lanz.desde : 0,
+      newDrop: !!lanz && Date.now() < lanz.hasta,
       restock: restock,
       pocos: pocos,
       fotos: col(r, 'fotos').split(/[,\n]/).map(f => f.trim()).filter(Boolean),
@@ -294,6 +314,8 @@ function resumirEstado(e, v){
   const dispo = v.filter(p => p.disponible);
   e.quedan = dispo.length === 1 && dispo[0].quedan ? dispo[0].quedan : 0;
   e.nuevo = v.some(p => p.nuevo);
+  e.lanzamiento = e.proximamente ? Math.max.apply(null, v.map(p => p.lanzamiento || 0)) : 0;
+  e.newDrop = v.some(p => p.newDrop);
   const puestos = v.map(p => p.bestSeller).filter(n => n > 0);
   e.bestSeller = puestos.length ? Math.min.apply(null, puestos) : 0;
   const ords = v.map(p => p.orden).filter(n => n > 0);
@@ -309,7 +331,7 @@ function repVariante(e){
   return e.variantes.find(p => p.disponible) || e.variantes.find(p => p.proximamente) || e.variantes[0];
 }
 // Orden dentro de cada categoría: disponibles, próximamente, restock en camino, agotados.
-function rangoEstado(e){ return e.disponible ? 0 : (e.proximamente ? 1 : (e.restock ? 2 : 3)); }
+function rangoEstado(e){ return e.lanzamiento ? -1 : e.disponible ? 0 : (e.proximamente ? 1 : (e.restock ? 2 : 3)); }
 
 // ¿La oferta está vigente en este instante?
 // - Sin PrecioOferta (o si no es menor al precio normal): no hay oferta.
@@ -653,11 +675,13 @@ function tarjetaHTML(e, ahora){
   const oferta = e.disponible && ofertaActiva(p, ahora);
   // Un agotado solo dice "Agotado": anunciarlo como nuevo o en oferta sería prometer algo que no hay.
   let tags = '';
-  if(e.proximamente) tags = '<span class="tag tag-nuevo">Próximamente</span>';
+  if(e.lanzamiento) tags = '<span class="tag tag-drop">NEW DROP</span>';
+  else if(e.proximamente) tags = '<span class="tag tag-nuevo">Próximamente</span>';
   else if(e.restock) tags = '<span class="tag tag-restock">Restock en camino</span>';
   else if(!e.disponible) tags = '<span class="tag tag-agotado">Agotado</span>';
   else {
-    if(e.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
+    if(e.newDrop) tags += '<span class="tag tag-drop">NEW DROP</span>';
+    else if(e.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
     if(oferta) tags += '<span class="tag tag-oferta">Oferta</span>';
     if(e.pocos) tags += '<span class="tag tag-pocos">' + (e.quedan ? textoQuedan(e.quedan, false) : 'Últimas unidades') + '</span>';
   }
@@ -667,9 +691,10 @@ function tarjetaHTML(e, ahora){
   const opciones = e.variantes.length > 1
     ? '<div class="variantes-txt">' + esc(e.variantes.map(v => v.variante || v.nombre).join(' · ')) + '</div>'
     : (grupo && grupo.variantes.length > 1 ? '<div class="variantes-txt">También en ' + esc(grupo.variantes.filter(v => v !== p).map(v => v.variante || v.nombre).join(' · ')) + '</div>' : '');
-  return '<a class="prod' + (apagado ? ' agotado' : '') + '" href="#/p/' + esc(e.id) + '">' +
+  return '<a class="prod' + (apagado ? ' agotado' : '') + (e.lanzamiento ? ' teaser' : '') + '" href="#/p/' + esc(e.id) + '">' +
     '<div class="prod-foto"><img loading="lazy" src="' + esc(fotoEntrada(e)) + '" data-fotos="' + esc(e.fotos.filter(f => !esVideo(f)).slice(0, 5).join('|')) + '" alt="' + esc(e.nombre) + '">' +
-    '<div class="tags">' + tags + '</div></div>' +
+    '<div class="tags">' + tags + '</div>' +
+    (e.lanzamiento ? '<div class="prod-sale">' + esc(textoSale(e.lanzamiento)) + '</div>' : '') + '</div>' +
     '<div class="prod-info">' + etiquetasHTML(e) + '<div class="prod-nombre">' + esc(e.nombre) + '</div>' + opciones +
     preciosHTML(p, ahora) +
     // El envío gratis se muestra también en agotados: así se sabe que vuelve con envío gratis.
@@ -1657,7 +1682,7 @@ function textoAviso(p){
     : '¡Hola Timeless! Quiero que me avisen cuando vuelva a haber stock de: ' + p.nombre;
 }
 function avisoHTML(p){
-  const estado = p.proximamente ? 'Próximamente' : (p.restock ? 'Restock en camino' : 'Agotado');
+  const estado = p.proximamente ? (p.lanzamiento ? textoSale(p.lanzamiento) : 'Próximamente') : (p.restock ? 'Restock en camino' : 'Agotado');
   return '<button type="button" class="btn" disabled>' + estado + '</button>' +
     '<p class="aviso-titulo">' + (p.proximamente || p.restock ? '¿Quieres que te avisemos cuando llegue?' : '¿Quieres que te avisemos cuando vuelva?') + '</p>' +
     '<a class="btn btn-wa" href="' + esc(urlWhatsApp(textoAviso(p))) + '" target="_blank" rel="noopener" data-contar="avisame/' + esc(p.id) + '">Avísame por WhatsApp</a>' +
@@ -1685,12 +1710,13 @@ function indiceGaleria(){
 // Cinturón: la gente cree que cada talla de pantalón es un cinturón distinto. Se explica
 // que es UN solo cinturón para varias tallas. Lee "28–40 aprox. (79–102cm de cintura)";
 // si el texto no tiene esa forma, se muestra tal cual.
-function tallasCinturonHTML(t){
+function tallasCinturonHTML(t, nombre){
   const m = String(t || '').match(/^\s*(\d+)\s*[–-]\s*(\d+)\s*(?:aprox\.?)?\s*(?:\(\s*(\d+)\s*[–-]\s*(\d+)\s*cm[^)]*\))?/i);
   if(!m) return esc(t);
   return '<b>Sirve para las tallas ' + m[1] + ' a ' + m[2] + '</b> <span class="aprox">(aprox.)</span>' +
-    '<span class="nota-316">Es UN solo cinturón para todas esas tallas: no tienes que elegir talla.' +
-    (m[3] ? ' Cintura de ' + m[3] + ' a ' + m[4] + ' cm.' : '') + '</span>';
+    '<span class="nota-316">' + (m[3] && (cfg.TALLAS_TEXTO_NUEVO || []).indexOf(nombre) > -1
+      ? 'Entra en cinturas de ' + m[3] + ' a ' + m[4] + ' cm. Es UN solo cinturón que agarra esas tallas: no tienes que elegir talla.'
+      : 'Es UN solo cinturón para todas esas tallas: no tienes que elegir talla.' + (m[3] ? ' Cintura de ' + m[3] + ' a ' + m[4] + ' cm.' : '')) + '</span>';
 }
 function renderFicha(indice){
   const e = ENTRADA_POR_ID[fichaEntradaId];
@@ -1749,7 +1775,7 @@ function renderFicha(indice){
         // En cinturones la talla es la del pantalón (así está en el Canva), con
         // una "?" que explica cómo medirse; en el resto, "Tallas" a secas.
         (esCinturon && p.tallas
-          ? '<div class="dato"><dt>Tallas de pantalón ' + infoHTML('¿Cómo saber tu talla?', '<b>¿Cómo saber tu talla?</b>' + guia) + '</dt><dd>' + tallasCinturonHTML(p.tallas) + '</dd></div>'
+          ? '<div class="dato"><dt>Tallas de pantalón ' + infoHTML('¿Cómo saber tu talla?', '<b>¿Cómo saber tu talla?</b>' + guia) + '</dt><dd>' + tallasCinturonHTML(p.tallas, p.nombre) + '</dd></div>'
           : dato('Tallas', p.tallas)) +
         (p.material
           ? '<div class="dato"><dt>Material</dt><dd>' + esc(p.material) +
@@ -2456,6 +2482,8 @@ function calcFirma(ahora){
 setInterval(() => {
   renderFranja();
   const ahora = Date.now();
+  // Llegó la hora de un lanzamiento: se recarga y el producto sale solo.
+  if(PRODUCTOS.some(p => p.lanzamiento && ahora >= p.lanzamiento)) location.reload();
   aplicarFotoInicio(ahora);
   const firma = calcFirma(ahora);
   if(firma !== firmaOfertas){
