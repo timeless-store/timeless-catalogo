@@ -165,7 +165,7 @@ const CATALOGO_CONFIG = {
     {desde: '2026-10-25 00:00', hasta: '2026-10-31 23:59',
      foto: 'img/promos/hero-halloween-pc.jpg', fotoCel: 'img/promos/hero-halloween-cel.jpg'},
     {desde: '2026-11-01 00:00', hasta: '2026-11-06 23:59',
-     foto: 'img/promos/hero-cyberwow-v2.jpg', fotoCel: 'img/promos/hero-cyberwow-v2.jpg'},
+     foto: 'img/promos/hero-cyberwow-pc.jpg', fotoCel: 'img/promos/hero-cyberwow-v2.jpg'},
   ],
 
   // CYBER WOW (2 al 6 de noviembre): precios de campaña. Antes del "desde" se ve el precio
