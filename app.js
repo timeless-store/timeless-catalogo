@@ -77,6 +77,14 @@ function parseMoney(s){
 // hora): así la oferta vence a la misma medianoche para todos, aunque el
 // celular del cliente esté en otra zona horaria.
 // Devuelve null si está vacía y NaN si está escrita de una forma que no se entiende.
+// CAMPANA_PRECIOS (config.js): precios de una campaña (Cyber Wow) con fecha de inicio y fin.
+// Fuera de esas fechas el producto vuelve solo a su precio normal.
+function campanaDe(nombre){
+  const c = cfg.CAMPANA_PRECIOS;
+  if(!c || !c.precios || !(c.precios[nombre] > 0)) return null;
+  const desde = parseFechaLima(c.desde), hasta = parseFechaLima(c.hasta);
+  return desde && hasta ? {precio: c.precios[nombre], desde: desde, hasta: hasta} : null;
+}
 function lanzamientoDe(nombre){
   const l = (cfg.LANZAMIENTOS || {})[nombre];
   if(!l) return null;
@@ -147,6 +155,7 @@ function filasAProductos(rows){
     // LANZAMIENTOS (config.js): un producto con Disponible = PRONTO sale solo a la hora indicada.
     // Antes de esa hora se ve su "teaser" (fotos visibles, oscuro, "sale hoy a las 6 pm").
     const lanz = lanzamientoDe(nombre);
+    const camp = campanaDe(nombre);
     if(lanz && pronto && Date.now() >= lanz.desde) pronto = false;
     const restock = ['restock', 'restock en camino', 'en camino'].indexOf(disp) > -1;
     const pocos = ['pocos', 'quedan pocos'].indexOf(disp) > -1;
@@ -157,8 +166,10 @@ function filasAProductos(rows){
       nombre: nombre,
       categoria: col(r, 'categoria') || 'Otros',
       precio: parseMoney(col(r, 'precio')),
-      precioOferta: parseMoney(col(r, 'preciooferta')),
-      ofertaHasta: parseFechaLima(col(r, 'ofertahasta')),
+      precioOferta: camp ? camp.precio : parseMoney(col(r, 'preciooferta')),
+      ofertaHasta: camp ? camp.hasta : parseFechaLima(col(r, 'ofertahasta')),
+      ofertaDesde: camp ? camp.desde : 0,
+      cyber: !!camp,
       // Solo se marca agotado con un NO explícito. Una celda vacía cuenta como disponible.
       disponible: !pronto && !restock && ['no', 'agotado', '0', 'false', 'falso'].indexOf(disp) === -1,
       proximamente: pronto,
@@ -171,7 +182,9 @@ function filasAProductos(rows){
       tallas: col(r, 'tallas'),
       nota: col(r, 'nota'),
       // Columnas opcionales: se marcan con SI. Vacío = no.
-      nuevo: esSi(col(r, 'nuevo')),
+      // REGLA: la etiqueta "Nuevo" dura máximo 7 días. En la columna Nuevo se escribe la FECHA de llegada
+      // (ej. 2026-11-03); un SI sin fecha ya no muestra la etiqueta.
+      nuevo: (() => { const f = parseFechaLima(col(r, 'nuevo')); return !!f && !isNaN(f) && Date.now() < f + 7 * 86400000; })(),
       envioGratis: esSi(col(r, 'enviogratis')),
       bestSeller: /^\d+$/.test(bs) ? Number(bs) : (esSi(bs) ? 99 : 0),
       // Visible = NO: el producto no sale en la página (ej. un lanzamiento que
@@ -340,6 +353,7 @@ function rangoEstado(e){ return e.lanzamiento ? -1 : e.disponible ? 0 : (e.proxi
 //   a regalar un descuento por un error de tipeo.
 function ofertaActiva(p, ahora){
   if(!(p.precioOferta > 0 && p.precioOferta < p.precio)) return false;
+  if(p.ofertaDesde && ahora < p.ofertaDesde) return false;   // campaña que todavía no empieza
   // Un agotado no muestra una oferta sin fecha de fin: así nadie espera que
   // vuelva a ese precio. Con fecha (máx. 2 días después de agotarse), sí.
   if(!p.disponible && p.ofertaHasta === null) return false;
@@ -647,8 +661,17 @@ function agrupar(){
     grupos[k].items.sort((a, b) => (rangoEstado(a.e) - rangoEstado(b.e)) || (ord(a) - ord(b)) || (a.i - b.i));
     grupos[k].items = grupos[k].items.map(x => x.e);
   });
+  // Si no queda ningún anillo disponible, la sección baja después de "Pant chains".
+  const pos = k => {
+    const i = orden.indexOf(k);
+    if(k === 'anillos' && !grupos[k].items.some(e => e.disponible)){
+      const ip = orden.indexOf('pant-chains') > -1 ? orden.indexOf('pant-chains') : orden.indexOf('pant chains');
+      if(ip > -1) return ip + 0.5;
+    }
+    return i;
+  };
   return Object.keys(grupos).sort((a, b) => {
-    const ia = orden.indexOf(a), ib = orden.indexOf(b);
+    const ia = pos(a), ib = pos(b);
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   }).map(k => grupos[k]);
 }
@@ -682,7 +705,7 @@ function tarjetaHTML(e, ahora){
   else {
     if(e.newDrop) tags += '<span class="tag tag-drop">NEW DROP</span>';
     else if(e.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
-    if(oferta) tags += '<span class="tag tag-oferta">Oferta</span>';
+    if(oferta) tags += p.cyber ? '<span class="tag tag-cyber">CYBER WOW</span>' : '<span class="tag tag-oferta">Oferta</span>';
     if(e.pocos) tags += '<span class="tag tag-pocos">' + (e.quedan ? textoQuedan(e.quedan, false) : 'Últimas unidades') + '</span>';
   }
   const apagado = !e.disponible && !e.proximamente;
@@ -956,11 +979,29 @@ function renderChipAviso(){
   li.hidden = !vigente;
   li.innerHTML = vigente ? '<a href="#catalogo" data-scroll="cat-' + slug(p.categoria) + '">' + esc(a.texto) + '</a>' : '';
 }
+function campanaHeroVigente(ahora){
+  const ch = cfg.CAMPANA_HERO, d = ch && parseFechaLima(ch.desde), h = ch && parseFechaLima(ch.hasta);
+  return !!(d && h && ahora >= d && ahora < h);
+}
 function renderHeroPromo(ahora){
   const el = document.getElementById('heroPromo');
   if(!el) return;
+  // Campaña de precios (Cyber Wow): su propio botón, solo entre sus fechas y sin combos a la vista.
+  const eyebrow = document.querySelector('.hero-eyebrow');
+  const ch = cfg.CAMPANA_HERO;
+  const enCampana = campanaHeroVigente(ahora);
+  if(eyebrow){
+    if(eyebrow.dataset.normal === undefined) eyebrow.dataset.normal = eyebrow.textContent;
+    eyebrow.textContent = enCampana && ch.eyebrow ? ch.eyebrow : eyebrow.dataset.normal;
+  }
   const combos = combosVisibles(ahora);
-  if(!combos.length){ el.innerHTML = ''; return; }
+  if(!combos.length){
+    el.innerHTML = enCampana
+      ? '<a class="hero-promo hero-cyber" href="#catalogo" data-scroll="' + esc(ch.ir || 'cat-mas-vendidos') + '"><span class="hero-promo-titulo">' + esc(ch.titulo) + '</span>' +
+        '<span class="hero-promo-sub">' + esc(ch.sub) + ' · ' + esc(ch.boton) + '</span></a>'
+      : '';
+    return;
+  }
   const fines = combos.map(x => x.pr.hasta).filter(h => h && !isNaN(h));
   // Los minutos en 00:00:00: ya no quedan promos vigentes.
   if(!combosActivos(ahora).length){
@@ -993,17 +1034,24 @@ function fotoDelInicio(ahora){
 function aplicarFotoInicio(ahora){
   const quiere = fotoDelInicio(ahora);
   if(quiere === heroFotoActual || quiere === heroCargando) return;
-  const poner = ruta => {
+  const poner = (ruta, ratio) => {
     heroFotoActual = ruta; heroCargando = '';
     document.querySelectorAll('.hero-foto, .hero-foto-fondo').forEach(img => { img.src = ruta; });
     // Con banner de campaña la portada se acomoda para que se vea completo (ver .hero-campana).
     const hero = document.querySelector('.hero');
-    if(hero) hero.classList.toggle('hero-campana', ruta !== HERO_FOTO_NORMAL);
+    if(hero){
+      hero.classList.toggle('hero-banner', ruta !== HERO_FOTO_NORMAL);
+      // Un banner cuadrado también lleva 'hero-campana' (el estilo de antes): si el navegador todavía
+      // tiene el CSS viejo en caché, el cuadrado se ve bien y el ancho se ve como foto normal.
+      hero.classList.toggle('hero-campana', ruta !== HERO_FOTO_NORMAL && Math.abs((ratio || 1) - 1) < 0.05);
+      // El banner puede no ser cuadrado: la portada se acomoda a sus proporciones.
+      if(ratio) hero.style.setProperty('--hero-ratio', ratio); else hero.style.removeProperty('--hero-ratio');
+    }
   };
   if(quiere === HERO_FOTO_NORMAL){ poner(quiere); return; }
   heroCargando = quiere;
   const prueba = new Image();
-  prueba.onload = () => poner(quiere);
+  prueba.onload = () => poner(quiere, prueba.naturalWidth && prueba.naturalHeight ? prueba.naturalWidth / prueba.naturalHeight : 1);
   prueba.onerror = () => { heroCargando = ''; };   // no existe o no cargó: se queda la foto de siempre
   prueba.src = quiere;
 }
@@ -1790,6 +1838,7 @@ function renderFicha(indice){
             (v.disponible ? '' : (v.proximamente ? ' · Próximamente' : (v.restock ? ' · En camino' : ' · Agotado'))) + '</button>').join('') +
           '</div></div>'
         : '') +
+      (p.cyber && p.disponible && ofertaActiva(p, ahora) ? '<div><span class="tag tag-cyber">CYBER WOW</span></div>' : '') +
       '<div class="ficha-precios">' + preciosHTML(p, ahora) + '</div>' +
       // Restock en camino: botón amarillo que baja al "Avísame".
       (p.restock ? '<button type="button" class="btn btn-restock" data-ir-aviso>Restock en camino · Te avisamos apenas llegue</button>' : '') +
@@ -2507,7 +2556,7 @@ document.addEventListener('error', e => {
 let firmaOfertas = '';
 function calcFirma(ahora){
   return PRODUCTOS.map(p => ofertaActiva(p, ahora) ? '1' : '0').join('') + '|' +
-         PROMOS.map(pr => (promoActiva(pr, ahora) ? '1' : '0') + (promoVisible(pr, ahora) ? '1' : '0')).join('');
+         PROMOS.map(pr => (promoActiva(pr, ahora) ? '1' : '0') + (promoVisible(pr, ahora) ? '1' : '0')).join('') + '|' + (campanaHeroVigente(ahora) ? '1' : '0');
 }
 setInterval(() => {
   renderFranja();
