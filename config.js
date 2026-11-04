@@ -171,9 +171,9 @@ const CATALOGO_CONFIG = {
   // CYBER WOW (2 al 6 de noviembre): precios de campaña. Antes del "desde" se ve el precio
   // normal; del "desde" al "hasta" sale el normal tachado + el precio Cyber con la etiqueta
   // CYBER WOW; después vuelve todo solo al precio normal. Los nombres deben ser EXACTOS a
-  // productos.csv. El Black Cross Deluxe no lleva descuento (por eso no está).
+  // productos.csv. El Black Cross Deluxe entró a S/69 el 3-nov.
   CAMPANA_PRECIOS: {desde: '2026-11-02 00:00', hasta: '2026-11-06 23:59', precios: {
-    'Cinturón Black Spider': 65, 'Cinturón White Spider': 59,
+    'Cinturón Black Cross Deluxe': 69, 'Cinturón Black Spider': 65, 'Cinturón White Spider': 59,
     'Cinturón Dark Knight': 35, 'Cinturón Chrome Hearts': 35, 'Cinturón Redglow': 30, 'Cinturón Hitboy': 30,
     'Collar Phantom Star': 25, 'Collar Shadow Cross': 25, 'Collar Aracnic Chain': 25,
     'Collar Demon Cross': 20, 'Collar Gothic Cross': 20, 'Collar Spiderman': 20, 'Collar Starboy': 18,
