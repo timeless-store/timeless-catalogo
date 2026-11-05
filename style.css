@@ -1482,3 +1482,6 @@ html.sin-scroll{overflow:hidden;}
 /* Cyber Wow: etiqueta y botón azules (el mismo azul de "Arma tu combo") */
 .tag-cyber{background:#2563eb;color:#fff;box-shadow:0 0 12px rgba(37,99,235,.7);}
 .hero-promo.hero-cyber{background:var(--accent);}
+/* Último día de la campaña: botón y franja en rojo */
+.hero-promo.hero-cyber.hero-urgente{background:#dc2626;box-shadow:0 0 22px rgba(220,38,38,.55);}
+.franja.franja-urgente{background:#dc2626;}

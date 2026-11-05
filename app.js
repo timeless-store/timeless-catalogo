@@ -6,6 +6,19 @@
    Nunca la pestaña Stocks ni el Apps Script del dashboard: tienen costos y márgenes. */
 
 const cfg = (typeof CATALOGO_CONFIG !== 'undefined') ? CATALOGO_CONFIG : {};
+// Solo en la página de PRUEBAS (VER_PROMOS_ANTES prendido): ?fecha=2026-11-07T12:00 simula esa
+// hora de Lima, para ver cómo se verá la página ese día. En el catálogo real no hace nada.
+(() => {
+  if(!cfg.VER_PROMOS_ANTES) return;
+  const m = location.search.match(/[?&]fecha=([^&]+)/);
+  if(!m) return;
+  const t = parseFechaLima(decodeURIComponent(m[1]).replace('T', ' '));
+  if(!t || isNaN(t)) return;
+  const desfase = t - Date.now(), real = Date.now.bind(Date);
+  Date.now = () => real() + desfase;
+  cfg.VER_PROMOS_ANTES = false;   // con fecha simulada se ve todo tal cual ese día
+})();
+const CARGADA_EN = Date.now();
 const CARRITO_KEY = 'timeless_catalogo_carrito';
 const ENVIO_KEY = 'timeless_catalogo_envio';
 const CACHE_KEY = 'timeless_catalogo_productos';
@@ -82,8 +95,22 @@ function parseMoney(s){
 function campanaDe(nombre){
   const c = cfg.CAMPANA_PRECIOS;
   if(!c || !c.precios || !(c.precios[nombre] > 0)) return null;
-  const desde = parseFechaLima(c.desde), hasta = parseFechaLima(c.hasta);
+  // "ampliacion": desde la hora del anuncio la campaña dura hasta la nueva fecha (antes no se nota).
+  const amp = c.ampliacion, anuncio = amp && parseFechaLima(amp.anuncio);
+  const desde = parseFechaLima(c.desde);
+  const hasta = anuncio && !isNaN(anuncio) && Date.now() >= anuncio ? parseFechaLima(amp.hasta) : parseFechaLima(c.hasta);
   return desde && hasta ? {precio: c.precios[nombre], desde: desde, hasta: hasta} : null;
+}
+// Etapas de una campaña (FRANJA, CAMPANA_HERO en config.js): desde cada "desde" se cambian esos
+// datos (texto, hasta, urgente…). Devuelve la campaña con todas las etapas que ya empezaron.
+function etapaDe(obj, ahora){
+  if(!obj) return obj;
+  let r = obj;
+  (obj.etapas || []).forEach(e => {
+    const d = parseFechaLima(e.desde);
+    if(d && !isNaN(d) && ahora >= d){ r = Object.assign({}, r, e); r.desde = obj.desde; }
+  });
+  return r;
 }
 function lanzamientoDe(nombre){
   const l = (cfg.LANZAMIENTOS || {})[nombre];
@@ -980,7 +1007,7 @@ function renderChipAviso(){
   li.innerHTML = vigente ? '<a href="#catalogo" data-scroll="cat-' + slug(p.categoria) + '">' + esc(a.texto) + '</a>' : '';
 }
 function campanaHeroVigente(ahora){
-  const ch = cfg.CAMPANA_HERO, d = ch && parseFechaLima(ch.desde), h = ch && parseFechaLima(ch.hasta);
+  const ch = etapaDe(cfg.CAMPANA_HERO, ahora), d = ch && parseFechaLima(ch.desde), h = ch && parseFechaLima(ch.hasta);
   return !!(d && h && ahora >= d && ahora < h);
 }
 function renderHeroPromo(ahora){
@@ -988,7 +1015,7 @@ function renderHeroPromo(ahora){
   if(!el) return;
   // Campaña de precios (Cyber Wow): su propio botón, solo entre sus fechas y sin combos a la vista.
   const eyebrow = document.querySelector('.hero-eyebrow');
-  const ch = cfg.CAMPANA_HERO;
+  const ch = etapaDe(cfg.CAMPANA_HERO, ahora);
   const enCampana = campanaHeroVigente(ahora);
   if(eyebrow){
     if(eyebrow.dataset.normal === undefined) eyebrow.dataset.normal = eyebrow.textContent;
@@ -997,7 +1024,7 @@ function renderHeroPromo(ahora){
   const combos = combosVisibles(ahora);
   if(!combos.length){
     el.innerHTML = enCampana
-      ? '<a class="hero-promo hero-cyber" href="#catalogo" data-scroll="' + esc(ch.ir || 'cat-mas-vendidos') + '"><span class="hero-promo-titulo">' + esc(ch.titulo) + '</span>' +
+      ? '<a class="hero-promo hero-cyber' + (ch.urgente ? ' hero-urgente' : '') + '" href="#catalogo" data-scroll="' + esc(ch.ir || 'cat-mas-vendidos') + '"><span class="hero-promo-titulo">' + esc(ch.titulo) + '</span>' +
         '<span class="hero-promo-sub">' + esc(ch.sub) + ' · ' + esc(ch.boton) + '</span></a>'
       : '';
     return;
@@ -1022,12 +1049,15 @@ let heroFotoActual = HERO_FOTO_NORMAL, heroCargando = '';
 function fotoDelInicio(ahora){
   const lista = cfg.HERO_FOTOS || [];
   const esPC = window.matchMedia ? matchMedia('(min-width:760px)').matches : true;
-  for(let i = 0; i < lista.length; i++){
-    const f = lista[i], d = parseFechaLima(f.desde), h = parseFechaLima(f.hasta);
-    const foto = esPC ? (f.foto || f.fotoCel) : (f.fotoCel || f.foto);
-    if(!foto || isNaN(d) || isNaN(h)) continue;
-    // En la página de pruebas (VER_PROMOS_ANTES) se ve la primera aunque no haya llegado la fecha.
-    if(cfg.VER_PROMOS_ANTES ? ahora < h : (d === null || ahora >= d) && (h === null || ahora < h)) return foto;
+  // La primera de la lista que esté vigente; en la página de pruebas (VER_PROMOS_ANTES), si no hay
+  // ninguna vigente, se ve la próxima aunque no haya llegado su fecha.
+  for(let pasada = 0; pasada < (cfg.VER_PROMOS_ANTES ? 2 : 1); pasada++){
+    for(let i = 0; i < lista.length; i++){
+      const f = lista[i], d = parseFechaLima(f.desde), h = parseFechaLima(f.hasta);
+      const foto = esPC ? (f.foto || f.fotoCel) : (f.fotoCel || f.foto);
+      if(!foto || isNaN(d) || isNaN(h)) continue;
+      if(pasada ? (h === null || ahora < h) : (d === null || ahora >= d) && (h === null || ahora < h)) return foto;
+    }
   }
   return HERO_FOTO_NORMAL;
 }
@@ -2556,11 +2586,16 @@ document.addEventListener('error', e => {
 let firmaOfertas = '';
 function calcFirma(ahora){
   return PRODUCTOS.map(p => ofertaActiva(p, ahora) ? '1' : '0').join('') + '|' +
-         PROMOS.map(pr => (promoActiva(pr, ahora) ? '1' : '0') + (promoVisible(pr, ahora) ? '1' : '0')).join('') + '|' + (campanaHeroVigente(ahora) ? '1' : '0');
+         PROMOS.map(pr => (promoActiva(pr, ahora) ? '1' : '0') + (promoVisible(pr, ahora) ? '1' : '0')).join('') + '|' + (campanaHeroVigente(ahora) ? '1' : '0') +
+         '|' + JSON.stringify(etapaDe(cfg.CAMPANA_HERO, ahora) || '');
 }
 setInterval(() => {
   renderFranja();
   const ahora = Date.now();
+  // Hora de anunciar la ampliación de la campaña (ej. Cyber Wow +1 día): se recarga para que
+  // los precios y las cuentas regresivas pasen a la nueva fecha final.
+  const amp = cfg.CAMPANA_PRECIOS && cfg.CAMPANA_PRECIOS.ampliacion, anuncio = amp && parseFechaLima(amp.anuncio);
+  if(anuncio && !isNaN(anuncio) && CARGADA_EN < anuncio && ahora >= anuncio){ location.reload(); return; }
   // Llegó la hora de un lanzamiento: se recarga y el producto sale solo.
   if(PRODUCTOS.some(p => p.lanzamiento && ahora >= p.lanzamiento)) location.reload();
   aplicarFotoInicio(ahora);
@@ -2603,15 +2638,19 @@ function renderAvisoConfig(){
 
 // Franja animada de campañas (Cyber Wow, Black Friday…), configurada en config.js.
 function renderFranja(){
-  const f = cfg.FRANJA || {};
+  const ahora = Date.now();
+  const f = etapaDe(cfg.FRANJA || {}, ahora);
   const el = document.getElementById('franja');
   if(!el) return;
   const prueba = /[?&]franja=prueba\b/.test(location.search);
-  const ahora = Date.now(), d = parseFechaLima(f.desde), h = parseFechaLima(f.hasta);
+  const d = parseFechaLima(f.desde), h = parseFechaLima(f.hasta);
   const vigente = f.activa && f.texto &&
     (d === null || (!isNaN(d) && ahora >= d)) && (h === null || (!isNaN(h) && ahora < h));
-  if(!(vigente || (prueba && f.texto))){ el.hidden = true; el.innerHTML = ''; return; }
-  if(el.hidden){
+  if(!(vigente || (prueba && f.texto))){ el.hidden = true; el.innerHTML = ''; el.dataset.texto = ''; return; }
+  // Último día: la franja se pone roja.
+  el.classList.toggle('franja-urgente', !!f.urgente);
+  if(el.hidden || el.dataset.texto !== f.texto){
+    el.dataset.texto = f.texto;
     // Dos mitades iguales: al llegar al final de una, empieza la otra sin salto.
     const mitad = ('<span>' + esc(f.texto) + '</span><span class="franja-sep" aria-hidden="true">✦</span>').repeat(6);
     el.innerHTML = '<div class="franja-pista"><div class="franja-mitad">' + mitad + '</div><div class="franja-mitad" aria-hidden="true">' + mitad + '</div></div>';

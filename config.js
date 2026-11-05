@@ -52,6 +52,13 @@ const CATALOGO_CONFIG = {
     texto: 'CYBER WOW · Hasta -20% de descuento en el catálogo · Del 2 al 6 de noviembre',
     desde: '2026-11-01 00:00',
     hasta: '2026-11-06 23:59',
+    // Etapas: desde cada fecha cambia el texto (y el fin). urgente = franja roja.
+    etapas: [
+      {desde: '2026-11-06 21:00', hasta: '2026-11-07 23:59',
+       texto: 'CYBER WOW · ¡Se extiende 1 día más! · Hasta -20% de descuento en el catálogo · Del 2 al 7 de noviembre'},
+      {desde: '2026-11-07 00:00', urgente: true,
+       texto: 'ÚLTIMO DÍA DEL CYBER WOW · Hasta -20% de descuento en el catálogo · Solo hoy sábado 7 hasta las 11:59 pm'},
+    ],
   },
 
   // ---------- ENVÍOS ----------
@@ -161,18 +168,31 @@ const CATALOGO_CONFIG = {
   // Ejemplo (se agrega cuando el banner esté listo):
   //   {desde: '2026-10-25 00:00', hasta: '2026-10-31 23:59', foto: 'img/promos/hero-halloween.jpg'},
   //   {desde: '2026-11-01 00:00', hasta: '2026-11-0X 23:59', foto: 'img/promos/hero-cyberwow-v2.jpg'},
+  // Se usa la PRIMERA de la lista que esté vigente (por eso las más cortas van antes).
   HERO_FOTOS: [
     {desde: '2026-10-25 00:00', hasta: '2026-10-31 23:59',
      foto: 'img/promos/hero-halloween-pc.jpg', fotoCel: 'img/promos/hero-halloween-cel.jpg'},
+    // Cyber Wow +1 día: desde el anuncio (viernes 6, 9 pm) dice "Del 02/11 al 07/11".
+    {desde: '2026-11-06 21:00', hasta: '2026-11-07 00:00',
+     foto: 'img/promos/hero-cyberwow-ext-pc.jpg', fotoCel: 'img/promos/hero-cyberwow-ext-cel.jpg'},
+    // Sábado 7: "ÚLTIMO DÍA · HOY 07/11" en rojo.
+    {desde: '2026-11-07 00:00', hasta: '2026-11-07 23:59',
+     foto: 'img/promos/hero-cyberwow-ultimo-pc.jpg', fotoCel: 'img/promos/hero-cyberwow-ultimo-cel.jpg'},
     {desde: '2026-11-01 00:00', hasta: '2026-11-06 23:59',
      foto: 'img/promos/hero-cyberwow-pc.jpg', fotoCel: 'img/promos/hero-cyberwow-v2.jpg'},
+    // Después del Cyber: el logo clásico de Timeless en negro (hasta la próxima campaña).
+    {desde: '2026-11-07 23:59', hasta: '2027-12-31 23:59',
+     foto: 'img/promos/hero-logo-pc.jpg', fotoCel: 'img/promos/hero-logo-cel.jpg'},
   ],
 
   // CYBER WOW (2 al 6 de noviembre): precios de campaña. Antes del "desde" se ve el precio
   // normal; del "desde" al "hasta" sale el normal tachado + el precio Cyber con la etiqueta
   // CYBER WOW; después vuelve todo solo al precio normal. Los nombres deben ser EXACTOS a
   // productos.csv. El Black Cross Deluxe entró a S/69 el 3-nov.
-  CAMPANA_PRECIOS: {desde: '2026-11-02 00:00', hasta: '2026-11-06 23:59', precios: {
+  // ampliacion: el Cyber se extiende al sábado 7; se anuncia el viernes 6 a las 9 pm (antes de esa
+  // hora las cuentas regresivas siguen marcando el viernes 6 y nadie ve la ampliación).
+  CAMPANA_PRECIOS: {desde: '2026-11-02 00:00', hasta: '2026-11-06 23:59',
+   ampliacion: {anuncio: '2026-11-06 21:00', hasta: '2026-11-07 23:59'}, precios: {
     'Cinturón Black Cross Deluxe': 69, 'Cinturón Black Spider': 65, 'Cinturón White Spider': 59,
     'Cinturón Dark Knight': 35, 'Cinturón Chrome Hearts': 35, 'Cinturón Redglow': 30, 'Cinturón Hitboy': 30,
     'Collar Phantom Star': 25, 'Collar Shadow Cross': 25, 'Collar Aracnic Chain': 25,
@@ -183,7 +203,11 @@ const CATALOGO_CONFIG = {
   // Botón azul del inicio mientras dura el Cyber Wow (sale cuando no hay combos de promos).
   CAMPANA_HERO: {desde: '2026-11-01 00:00', hasta: '2026-11-06 23:59',
     titulo: '⚡ CYBER WOW', sub: 'Hasta -20% de descuento · Del 2 al 6 de noviembre', boton: 'Ver catálogo →',
-    ir: 'cat-mas-vendidos', eyebrow: 'Cyber Wow 2026'},
+    ir: 'cat-mas-vendidos', eyebrow: 'Cyber Wow 2026',
+    etapas: [
+      {desde: '2026-11-06 21:00', hasta: '2026-11-07 23:59', sub: '¡1 día más! · Hasta -20% · Del 2 al 7 de noviembre'},
+      {desde: '2026-11-07 00:00', urgente: true, titulo: '⚡ CYBER WOW · ÚLTIMO DÍA', sub: 'Hasta -20% · Solo hoy hasta las 11:59 pm'},
+    ]},
 
   // Lanzamientos programados (NEW DROP). El producto debe estar en productos.csv con
   // Disponible = PRONTO y Visible = SI: antes de "desde" se ve oscuro con las fotos y
