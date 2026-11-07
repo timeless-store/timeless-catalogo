@@ -112,6 +112,14 @@ function etapaDe(obj, ahora){
   });
   return r;
 }
+// ETIQUETAS_TEMP (config.js): etiqueta roja temporal en un producto (ej. "ÚLTIMO DÍA DE CYBER"),
+// solo entre sus fechas. Devuelve el texto o ''.
+function etiquetaTemp(nombre, ahora){
+  const t = (cfg.ETIQUETAS_TEMP || {})[nombre];
+  if(!t) return '';
+  const d = parseFechaLima(t.desde), h = parseFechaLima(t.hasta);
+  return d && h && !isNaN(d) && !isNaN(h) && ahora >= d && ahora < h ? t.texto : '';
+}
 function lanzamientoDe(nombre){
   const l = (cfg.LANZAMIENTOS || {})[nombre];
   if(!l) return null;
@@ -647,7 +655,7 @@ function refrescarEstado(){
     const antes = lineasValidas(Date.now()).length;
     FILAS_ESTADO = rows;
     usarFilas(FILAS_PRODUCTOS);
-    if(lineasValidas(Date.now()).length < antes) toast('Un producto de tu carrito se agotó y se quitó');
+    if(lineasValidas(Date.now()).length < antes) toast('Un producto de tu carrito se agotó');
   }).catch(() => {}).then(() => { ESTADO_CARGANDO = false; });
 }
 setInterval(() => {
@@ -760,6 +768,8 @@ function tarjetaHTML(e, ahora){
     if(e.newDrop) tags += '<span class="tag tag-drop">NEW DROP</span>';
     else if(e.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
     if(oferta) tags += p.cyber ? '<span class="tag tag-cyber">CYBER WOW</span>' : '<span class="tag tag-oferta">Oferta</span>';
+    const tmp = etiquetaTemp(p.nombre, ahora);
+    if(tmp) tags += '<span class="tag tag-ultimo">' + esc(tmp) + '</span>';
     if(e.pocos) tags += '<span class="tag tag-pocos">' + (e.quedan ? textoQuedan(e.quedan, false) : 'Últimas unidades') + '</span>';
   }
   const apagado = !e.disponible && !e.proximamente;
@@ -1895,7 +1905,9 @@ function renderFicha(indice){
             (v.disponible ? '' : (v.proximamente ? ' · Próximamente' : (v.restock ? ' · En camino' : ' · Agotado'))) + '</button>').join('') +
           '</div></div>'
         : '') +
-      (p.cyber && p.disponible && ofertaActiva(p, ahora) ? '<div><span class="tag tag-cyber">CYBER WOW</span></div>' : '') +
+      (p.cyber && p.disponible && ofertaActiva(p, ahora)
+        ? '<div><span class="tag tag-cyber">CYBER WOW</span>' + (p.disponible && etiquetaTemp(p.nombre, ahora) ? ' <span class="tag tag-ultimo">' + esc(etiquetaTemp(p.nombre, ahora)) + '</span>' : '') + '</div>'
+        : '') +
       '<div class="ficha-precios">' + preciosHTML(p, ahora) + '</div>' +
       // Restock en camino: botón amarillo que baja al "Avísame".
       (p.restock ? '<button type="button" class="btn btn-restock" data-ir-aviso>Restock en camino · Te avisamos apenas llegue</button>' : '') +
@@ -2313,7 +2325,7 @@ function renderCarrito(){
           '<img src="' + esc(c.pr && c.pr.foto ? c.pr.foto : FOTO_VACIA) + '" alt="">' +
           '<div><div class="linea-nombre">' + esc(c.pr ? c.pr.nombre : 'Promo que ya terminó') + '</div>' +
           '<div class="linea-sub">Se agotó algo del combo: no se incluye en el pedido</div></div>' +
-          '<div class="linea-der"><button type="button" class="btn-link" data-quitar="' + esc(id) + '">Quitar</button></div></div>';
+          '<div class="linea-der"><button type="button" class="quitar-x" data-quitar="' + esc(id) + '" aria-label="Quitar del carrito">✕</button></div></div>';
       }
       const normal = c.ps.reduce((a, q) => a + precioVigente(q, ahora), 0);
       return '<div class="linea linea-combo">' +
@@ -2332,7 +2344,7 @@ function renderCarrito(){
         '<img src="' + esc(p ? fotoDe(p) : FOTO_VACIA) + '" alt="">' +
         '<div><div class="linea-nombre">' + esc(p ? p.nombre : 'Producto que ya no está en el catálogo') + '</div>' +
         '<div class="linea-sub">Se agotó: no se incluye en el pedido</div></div>' +
-        '<div class="linea-der"><button type="button" class="btn-link" data-quitar="' + esc(id) + '">Quitar</button></div></div>';
+        '<div class="linea-der"><button type="button" class="quitar-x" data-quitar="' + esc(id) + '" aria-label="Quitar del carrito">✕</button></div></div>';
     }
     const unit = precioVigente(p, ahora);
     return '<div class="linea">' +
@@ -2344,7 +2356,12 @@ function renderCarrito(){
       '<span>' + cant + '</span>' +
       '<button type="button" data-cant="1" data-id="' + esc(id) + '" aria-label="Agregar uno"' + (cant >= topeLinea(id) ? ' disabled' : '') + '>+</button></div>' +
       (p.quedan ? '<div class="linea-quedan">' + textoQuedan(p.quedan, true) + '</div>' : '') + '</div></div>';
-  }).join('');
+  });
+  // Lo que se agotó no entra al pedido: va al final, en gris, con su ✕ para quitarlo.
+  const filasFuera = filas.filter(h => h.indexOf('<div class="linea fuera">') === 0);
+  const filasOk = filas.filter(h => h.indexOf('<div class="linea fuera">') !== 0);
+  const filasHTML = filasOk.join('') +
+    (filasFuera.length ? '<div class="fuera-titulo">Ya no disponible · no entra en tu pedido</div>' + filasFuera.join('') : '');
 
   // Promos aplicadas (solo si hay).
   const promosHTML = ped.promos.length
@@ -2373,7 +2390,7 @@ function renderCarrito(){
       '<div class="total"><span>Total aprox.</span><b>' + fmtPrecio(ped.productos + ped.costoEnvio) + '</b></div>'
     : '<div class="total"><span>Total productos</span><b>' + fmtPrecio(ped.productos) + '</b></div>';
 
-  body.innerHTML = '<div class="sheet-pad"><h2>Tu pedido</h2>' + filas + promosHTML + enviosHTML +
+  body.innerHTML = '<div class="sheet-pad"><h2>Tu pedido</h2>' + filasHTML + promosHTML + enviosHTML +
     '<div class="resumen-total">' + totalAprox + '</div>' +
     (ped.gratis
       ? '<div class="envio-gratis envio-gratis-caja">🚚 Envío gratis aplicado</div>'
@@ -2615,7 +2632,8 @@ let firmaOfertas = '';
 function calcFirma(ahora){
   return PRODUCTOS.map(p => ofertaActiva(p, ahora) ? '1' : '0').join('') + '|' +
          PROMOS.map(pr => (promoActiva(pr, ahora) ? '1' : '0') + (promoVisible(pr, ahora) ? '1' : '0')).join('') + '|' + (campanaHeroVigente(ahora) ? '1' : '0') +
-         '|' + JSON.stringify(etapaDe(cfg.CAMPANA_HERO, ahora) || '');
+         '|' + JSON.stringify(etapaDe(cfg.CAMPANA_HERO, ahora) || '') +
+         '|' + Object.keys(cfg.ETIQUETAS_TEMP || {}).map(n => etiquetaTemp(n, ahora) ? '1' : '0').join('');
 }
 setInterval(() => {
   renderFranja();

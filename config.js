@@ -217,6 +217,12 @@ const CATALOGO_CONFIG = {
     'Cinturón Black Cross Deluxe': {desde: '2026-10-29 18:00', hasta: '2026-11-05 23:59'},
   },
 
+  // Etiqueta roja temporal sobre un producto, solo entre sus fechas (hora de Lima).
+  // Sábado 7-nov: último día del Cyber Wow en el Dark Knight. Se apaga sola a las 11:59 pm.
+  ETIQUETAS_TEMP: {
+    'Cinturón Dark Knight': {texto: 'ÚLTIMO DÍA DE CYBER', desde: '2026-11-07 00:00', hasta: '2026-11-07 23:59'},
+  },
+
   // Productos que NO muestran "Restock en camino" aunque el dashboard lo diga (salen como Agotado).
   SIN_AVISO_RESTOCK: ['Pant Chain Chrome Hearts'],
 
