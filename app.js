@@ -606,7 +606,9 @@ function quitarCarga(){
 }
 setTimeout(quitarCarga, 4000);
 
+let FILAS_PRODUCTOS = null;
 function usarFilas(rows){
+  FILAS_PRODUCTOS = rows;
   const todos = filasAProductos(rows);
   aplicarEstado(todos, FILAS_ESTADO);
   PRODUCTOS = todos.filter(p => p.visible);
@@ -622,13 +624,38 @@ function usarFilas(rows){
 // La lista de estado del dashboard es opcional: si no carga, se usa la última
 // que vio este celular y, si no hay, lo que diga productos.csv.
 let FILAS_ESTADO = null;
+let ESTADO_VERIFICADO = false, ULTIMO_ESTADO = 0, ESTADO_CARGANDO = false;
 function cargarEstado(){
   if(!cfg.CSV_ESTADO) return Promise.resolve();
   return fetchCSV(cfg.CSV_ESTADO).then(rows => {
     saveCache(rows, ESTADO_KEY);
     FILAS_ESTADO = rows;
+    ESTADO_VERIFICADO = true; ULTIMO_ESTADO = Date.now();
   }).catch(() => { FILAS_ESTADO = loadCache(ESTADO_KEY); });
 }
+/* La lista de estado (agotado / quedan) se vuelve a leer: cada 20 s mientras no se haya podido
+   verificar, cada 5 min con la pestaña abierta, al volver a la pestaña, al abrir el carrito y al
+   pasar a "Hacer pedido". Si algo del carrito se agotó, se quita y se avisa. Así una pestaña que
+   se quedó abierta (o una carga que falló) no deja pedir un producto que ya se agotó. */
+function refrescarEstado(){
+  if(!cfg.CSV_ESTADO || !FILAS_PRODUCTOS || ESTADO_CARGANDO) return Promise.resolve();
+  ESTADO_CARGANDO = true;
+  return fetchCSV(cfg.CSV_ESTADO).then(rows => {
+    ESTADO_VERIFICADO = true; ULTIMO_ESTADO = Date.now();
+    saveCache(rows, ESTADO_KEY);
+    if(JSON.stringify(rows) === JSON.stringify(FILAS_ESTADO)) return;
+    const antes = lineasValidas(Date.now()).length;
+    FILAS_ESTADO = rows;
+    usarFilas(FILAS_PRODUCTOS);
+    if(lineasValidas(Date.now()).length < antes) toast('Un producto de tu carrito se agotó y se quitó');
+  }).catch(() => {}).then(() => { ESTADO_CARGANDO = false; });
+}
+setInterval(() => {
+  if(!ESTADO_VERIFICADO || Date.now() - ULTIMO_ESTADO > 5 * 60000) refrescarEstado();
+}, 20000);
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && Date.now() - ULTIMO_ESTADO > 60000) refrescarEstado();
+});
 
 // Las promos son opcionales: si no cargan, la página funciona igual sin ellas.
 function cargarPromos(){
@@ -2460,6 +2487,7 @@ document.getElementById('carritoBody').addEventListener('click', e => {
   const paso = t.closest('[data-paso]');
   if(paso){
     pasoCarrito = paso.dataset.paso;
+    if(pasoCarrito === 'canal') refrescarEstado();
     if(pasoCarrito === 'canal'){ const pd = calcularPedido(Date.now()); pixel('InitiateCheckout', {value: pd.productos, currency: 'PEN', num_items: pd.lineas.reduce((a, l) => a + l.cant, 0)}); }
     renderCarrito(); return;
   }
@@ -2548,7 +2576,7 @@ window.addEventListener('hashchange', () => {
   // ¿El combo se abrió desde la ficha de un producto? Entonces tendrá flecha para volver.
   comboDesdeFicha = location.hash.indexOf('#/combo/') === 0 && hashPrevio.indexOf('#/p/') === 0;
   // Al entrar al carrito siempre se empieza por la lista.
-  if(location.hash === '#/carrito') pasoCarrito = 'lista';
+  if(location.hash === '#/carrito'){ pasoCarrito = 'lista'; refrescarEstado(); }
   ruta();
 });
 document.addEventListener('click', e => {
