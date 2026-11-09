@@ -141,22 +141,27 @@ const CATALOGO_CONFIG = {
   // el dashboard (columna Orden de la lista). false = el orden de productos.csv.
   ORDEN_AUTOMATICO: false,
 
+  // "Más vendidos" siempre muestra 6. Si se agota alguno y la fila queda con menos, se llena con
+  // estos productos (en este orden), AUNQUE estén agotados o en restock: así la gente puede
+  // dejar su "Avísame". Hoy hay 6 disponibles, así que esto no se nota hasta que se agote uno.
+  MAS_VENDIDOS_RELLENO: ['Anillos Demon & Angel Wings Duki', 'Collar Phantom Star'],
+
   // Dónde va la sección de Promociones cuando hay combos activos:
   // 'primero' (arriba de Más vendidos) o 'despues-de-mas-vendidos'.
-  PROMOS_POSICION: 'primero',
+  PROMOS_POSICION: 'despues-de-mas-vendidos',
 
   // Minutos que la cuenta de una promo se queda en 00:00:00 ("Promo terminada")
   // antes de que desaparezca todo lo de promos.
   PROMO_GRACIA_MIN: 5,
 
-  // Título y subtítulo de la sección de promos de ESTA campaña (Halloween, 25 al
-  // 31 de octubre de 2026). Al terminar la campaña: dejarlos vacíos ('') para volver
-  // al título "Promociones" de siempre.
-  PROMOS_TITULO: 'Vuelven las promos Spider 🕷️ · Edición Halloween',
-  PROMOS_ETIQUETA: 'PROMOS HALLOWEEN',          // arriba del título al abrir un combo (vacío = "Promoción")
-  PROMOS_HERO: '🎃 PROMOS HALLOWEEN',            // botón grande del inicio (vacío = "🔥 Promos disponibles")
-  PROMOS_HERO_SUB: 'Combos Spider desde S/89',    // primera parte de la línea de abajo del botón (vacío = solo la fecha)
-  PROMOS_SUBTITULO: 'Envío gratis en estos combos · Lima: el delivery demora 1 día, pide hasta el viernes 30 para que llegue el 31 · Provincia: Shalom demora de 1 a 3 días, pide hasta el miércoles 28 para que llegue antes de Halloween',
+  // Textos de la sección de promos. Título vacío = "Promociones" de siempre. Combos con el
+  // Demon Cross desde el 9-nov-2026. Si hay una campaña con tema (Halloween, Black Friday),
+  // se ponen aquí su título, etiqueta y botón.
+  PROMOS_TITULO: '',
+  PROMOS_ETIQUETA: '',                           // arriba del título al abrir un combo (vacío = "Promoción")
+  PROMOS_HERO: '',                                // botón grande del inicio (vacío = "🔥 Promos disponibles")
+  PROMOS_HERO_SUB: 'Combo cinturón premium + collar con envío gratis desde S/79',    // primera parte de la línea de abajo del botón (vacío = solo la fecha)
+  PROMOS_SUBTITULO: 'Envío gratis en estos combos. Toca un combo para ver las fotos y videos de cada producto y agrégalo al carrito: el precio de la promo se aplica solo.',
 
   // Solo para la página de PRUEBAS: muestra las promos aunque todavía no llegue su
   // fecha de inicio ("Desde" en promos.csv). En el catálogo real va en false.
@@ -185,20 +190,13 @@ const CATALOGO_CONFIG = {
      foto: 'img/promos/hero-logo-pc.jpg', fotoCel: 'img/promos/hero-logo-cel.jpg'},
   ],
 
-  // CYBER WOW (2 al 6 de noviembre): precios de campaña. Antes del "desde" se ve el precio
-  // normal; del "desde" al "hasta" sale el normal tachado + el precio Cyber con la etiqueta
-  // CYBER WOW; después vuelve todo solo al precio normal. Los nombres deben ser EXACTOS a
-  // productos.csv. El Black Cross Deluxe entró a S/69 el 3-nov.
-  // ampliacion: el Cyber se extiende al sábado 7; se anuncia el viernes 6 a las 9 pm (antes de esa
-  // hora las cuentas regresivas siguen marcando el viernes 6 y nadie ve la ampliación).
-  CAMPANA_PRECIOS: {desde: '2026-11-02 00:00', hasta: '2026-11-06 23:59',
-   ampliacion: {anuncio: '2026-11-06 21:00', hasta: '2026-11-07 23:59'}, precios: {
-    'Cinturón Black Cross Deluxe': 69, 'Cinturón Black Spider': 65, 'Cinturón White Spider': 59,
-    'Cinturón Dark Knight': 35, 'Cinturón Chrome Hearts': 35, 'Cinturón Redglow': 30, 'Cinturón Hitboy': 30,
-    'Collar Phantom Star': 25, 'Collar Shadow Cross': 25, 'Collar Aracnic Chain': 25,
-    'Collar Demon Cross': 20, 'Collar Gothic Cross': 20, 'Collar Spiderman': 20, 'Collar Starboy': 18,
-    'Anillos Demon & Angel Wings Duki': 20,
-  }},
+  // Precios de una CAMPAÑA (Cyber Wow, Black Friday): { desde, hasta, precios: {'Nombre exacto': precio} }.
+  // Del "desde" al "hasta" sale el precio normal tachado + el de campaña; fuera de esas fechas
+  // vuelve todo al precio normal. Mientras haya nombres aquí, ESTE precio manda sobre PrecioOferta
+  // de productos.csv (aunque la campaña ya haya terminado), por eso entre campañas se deja vacío.
+  // Opcional: ampliacion: {anuncio: 'AAAA-MM-DD HH:MM', hasta: 'AAAA-MM-DD HH:MM'} (extiende la
+  // campaña desde esa hora). El Cyber Wow (2 al 7 de noviembre de 2026) ya terminó: vacío.
+  CAMPANA_PRECIOS: {desde: '', hasta: '', precios: {}},
 
   // Botón azul del inicio mientras dura el Cyber Wow (sale cuando no hay combos de promos).
   CAMPANA_HERO: {desde: '2026-11-01 00:00', hasta: '2026-11-06 23:59',

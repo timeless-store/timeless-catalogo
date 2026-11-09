@@ -871,17 +871,19 @@ function estadoCombo(x, ahora){
   return {casilleros: casilleros, sel: sel, completo: sel.every(Boolean), fotoAlt: fotoAlt,
           // ¿Se puede armar? Cada casillero tiene que tener al menos una opción con stock.
           disponible: casilleros.every(ops => ops.some(p => p.disponible)),
-          normal: elegidos.reduce((a, p) => a + precioVigente(p, ahora), 0),
+          normal: elegidos.reduce((a, p) => a + p.precio, 0),
           // Envío gratis si alguna opción lo trae (el cinturón premium, en estos combos).
           gratis: casilleros.some(ops => ops.length && ops.every(p => p.envioGratis))};
 }
 // Tarjeta del combo en la página: la foto del combo (la del Canva), precio y "Arma tu combo".
 // Lo que costarían las opciones sin promo, de la más barata a la más cara (para
-// mostrar "antes S/95–100" tachado). Solo cuentan las opciones disponibles.
+// mostrar "antes S/95–100" tachado). Solo cuentan las opciones disponibles. Se usa el
+// precio REGULAR (sin ofertas): así un combo con un producto en oferta sigue mostrando
+// el total sin ningún descuento (ej. White Spider 75 + Demon Cross 25 = S/100).
 function rangoNormal(st, ahora){
   let min = 0, max = 0;
   st.casilleros.forEach(ops => {
-    const hay = ops.filter(p => p.disponible), lista = (hay.length ? hay : ops).map(p => precioVigente(p, ahora));
+    const hay = ops.filter(p => p.disponible), lista = (hay.length ? hay : ops).map(p => p.precio);
     if(!lista.length) return;
     min += Math.min.apply(null, lista); max += Math.max.apply(null, lista);
   });
@@ -910,7 +912,7 @@ function comboHTML(x, ahora){
         '<span class="precio-oferta combo-precio">' + fmtPrecio(x.pr.valor) + '</span></div>' +
       (st.gratis ? '<div class="envio-gratis">Con envío gratis</div>' : '') +
       (x.pr.hasta ? '<div class="cuenta">Termina en <b class="mono" data-hasta="' + x.pr.hasta + '">' + fmtCuenta(x.pr.hasta - ahora) + '</b></div>' : '') +
-      (st.disponible ? '<span class="btn btn-primario">Arma tu combo</span>' : '<span class="btn" aria-disabled="true">Agotado: mira los otros combos</span>') +
+      (st.disponible ? '<span class="btn btn-primario">' + (st.casilleros.every(ops => ops.length === 1) ? 'Ver combo' : 'Arma tu combo') + '</span>' : '<span class="btn" aria-disabled="true">Agotado: mira los otros combos</span>') +
     '</div></a>';
 }
 // Todas las fotos y videos de un producto, en una tira que se desliza. Las
@@ -1149,6 +1151,13 @@ function renderGrilla(){
   const MAS_VENDIDOS_MAX = 6;
   const mas = TARJETAS.filter(e => e.bestSeller && (e.disponible || e.restock))
     .sort((a, b) => a.bestSeller - b.bestSeller).slice(0, MAS_VENDIDOS_MAX);
+  // Si la fila queda con menos de 6 (se agotó alguno), se llena con los productos de
+  // MAS_VENDIDOS_RELLENO (config.js), aunque estén agotados: así la gente toca "Avísame".
+  (cfg.MAS_VENDIDOS_RELLENO || []).forEach(nombre => {
+    if(mas.length >= MAS_VENDIDOS_MAX) return;
+    const e = TARJETAS.find(t => norm(t.nombre) === norm(nombre));
+    if(e && mas.indexOf(e) === -1) mas.push(e);
+  });
   const masHTML = mas.length
     ? '<section class="cat" id="cat-mas-vendidos"><h2 class="cat-titulo">Más vendidos</h2>' +
       '<div class="fila">' + mas.map(e => tarjetaHTML(e, ahora)).join('') + '</div></section>'
@@ -1744,7 +1753,7 @@ function lineasValidas(ahora){
     if(esClaveCombo(k)){
       const c = leerCombo(k), cant = carrito[k], unit = c.pr.valor;
       return {combo: c.pr, ps: c.ps, key: k, p: c.ps[0], cant: cant, unit: unit, sub: unit * cant,
-              normal: c.ps.reduce((a, p) => a + precioVigente(p, ahora), 0), oferta: false};
+              normal: c.ps.reduce((a, p) => a + p.precio, 0), oferta: false};
     }
     const p = POR_ID[k], cant = carrito[k], unit = precioVigente(p, ahora);
     return {p: p, cant: cant, unit: unit, sub: unit * cant, oferta: ofertaActiva(p, ahora)};
@@ -2327,7 +2336,7 @@ function renderCarrito(){
           '<div class="linea-sub">Se agotó algo del combo: no se incluye en el pedido</div></div>' +
           '<div class="linea-der"><button type="button" class="quitar-x" data-quitar="' + esc(id) + '" aria-label="Quitar del carrito">✕</button></div></div>';
       }
-      const normal = c.ps.reduce((a, q) => a + precioVigente(q, ahora), 0);
+      const normal = c.ps.reduce((a, q) => a + q.precio, 0);
       return '<div class="linea linea-combo">' +
         '<img src="' + esc(c.pr.foto || fotoPropia(c.ps[0])) + '" alt="">' +
         '<div><div class="linea-nombre">' + esc(c.pr.nombre) + '</div>' +
