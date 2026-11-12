@@ -1002,7 +1002,10 @@ document.getElementById('comboBody').addEventListener('click', e => {
         contar('combo/' + i, 'Agregó combo: ' + pr.nombre);
         pixel('AddToCart', {content_ids: ids, content_name: pr.nombre, content_type: 'product', value: pr.valor, currency: 'PEN'});
         toast('Combo agregado al carrito');
-        location.hash = '#/carrito';
+        // La foto del combo vuela hacia el carrito y, medio segundo después, se abre el carrito.
+        const vuela = volarAlCarrito(add.getBoundingClientRect(), pr.foto || fotoPropia(POR_ID[ids[0]]));
+        if(vuela){ add.disabled = true; setTimeout(() => { location.hash = '#/carrito'; }, 500); }
+        else location.hash = '#/carrito';
       }
     }
   }
@@ -1766,10 +1769,63 @@ function lineasValidas(ahora){
   });
 }
 function renderContador(){
-  const n = lineasValidas(Date.now()).reduce((a, l) => a + l.cant, 0);
+  const ped = calcularPedido(Date.now());
+  const n = ped.lineas.reduce((a, l) => a + l.cant, 0);
   const el = document.getElementById('carritoNum');
   el.textContent = n;
   el.classList.toggle('con', n > 0);
+  // Barra fija de abajo (solo celular, ver style.css): "Ver carrito · 2 productos · S/124".
+  const barra = document.getElementById('barraCarrito');
+  if(barra){
+    document.getElementById('barraTxt').textContent = 'Ver carrito · ' + n + (n === 1 ? ' producto' : ' productos');
+    document.getElementById('barraTotal').textContent = fmtPrecio(ped.productos);
+    barra.classList.toggle('ver', n > 0);
+    document.body.classList.toggle('con-barra', n > 0);
+  }
+}
+
+/* "Vuela al carrito": al agregar, la foto del producto sale del botón y viaja hasta el
+   carrito, y el número rebota. Solo CSS/Web Animations (sin librerías). Quien pidió
+   "menos movimiento" en su celular no ve el vuelo. */
+function sinMovimiento(){ return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
+function rebotarCarrito(){
+  ['carritoNum', 'barraTotal'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el && el.animate) el.animate([{transform: 'scale(1)'}, {transform: 'scale(1.4)', offset: .4}, {transform: 'scale(1)'}], {duration: 380, easing: 'ease-out'});
+  });
+}
+// Adónde vuela: el número del carrito de la cabecera. Con una hoja abierta la página está
+// fija y la cabecera queda fuera de la pantalla: entonces va hacia la esquina de arriba a la derecha.
+function destinoCarrito(){
+  const el = document.getElementById('carritoNum');
+  const r = el ? el.getBoundingClientRect() : null;
+  if(r && r.top >= 0 && r.bottom <= window.innerHeight && r.width > 0) return {x: r.left + r.width / 2, y: r.top + r.height / 2};
+  return {x: window.innerWidth - 48, y: 30};
+}
+// desde = el rectángulo del botón que se tocó (se toma ANTES de repintar la hoja); src = la foto.
+function volarAlCarrito(desde, src){
+  if(!desde || !src || sinMovimiento() || !document.body.animate){ rebotarCarrito(); return false; }
+  const tam = 64, cx = desde.left + desde.width / 2, cy = desde.top + desde.height / 2;
+  const d = destinoCarrito(), dx = d.x - cx, dy = d.y - cy;
+  const img = document.createElement('img');
+  img.className = 'vuela';
+  img.alt = '';
+  img.src = src;
+  img.style.left = (cx - tam / 2) + 'px';
+  img.style.top = (cy - tam / 2) + 'px';
+  document.body.appendChild(img);
+  // Respaldo: si el navegador no avanza la animación (pestaña en segundo plano), la foto no se queda pegada.
+  let hecho = false;
+  const fin = () => { if(hecho) return; hecho = true; img.remove(); rebotarCarrito(); };
+  setTimeout(fin, 1500);
+  try {
+    img.animate([
+      {transform: 'translate(0,0) scale(1)', opacity: 1},
+      {transform: 'translate(' + (dx * .45) + 'px,' + (dy * .45 - 50) + 'px) scale(.8)', opacity: 1, offset: .45},
+      {transform: 'translate(' + dx + 'px,' + dy + 'px) scale(.15)', opacity: .35}
+    ], {duration: 650, easing: 'cubic-bezier(.45,0,.55,1)'}).onfinish = fin;
+  } catch(err){ fin(); return false; }
+  return true;
 }
 
 // Basta UN producto marcado con EnvioGratis para que todo el pedido vaya con
@@ -2187,7 +2243,11 @@ document.getElementById('fichaBody').addEventListener('click', e => {
   const add = e.target.closest('[data-agregar]');
   const mas = e.target.closest('[data-ficha-cant]');
   if(add || mas){
-    if(add){ if(agregar(add.dataset.agregar)) toast('Agregado al carrito'); else return; }
+    if(add){
+      const desde = add.getBoundingClientRect();   // antes de repintar la ficha
+      if(agregar(add.dataset.agregar)){ toast('Agregado al carrito'); volarAlCarrito(desde, fotoDe(POR_ID[add.dataset.agregar])); }
+      else return;
+    }
     else setCantidad(fichaVarId, (carrito[fichaVarId] || 0) + Number(mas.dataset.fichaCant));
     // Se repinta sin mover la ficha (antes saltaba hasta la foto de arriba).
     const sheet = document.querySelector('#fichaOverlay .sheet');

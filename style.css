@@ -1491,3 +1491,52 @@ html.sin-scroll{overflow:hidden;}
 /* Último día de la campaña: botón y franja en rojo */
 .hero-promo.hero-cyber.hero-urgente{background:#dc2626;box-shadow:0 0 22px rgba(220,38,38,.55);}
 .franja.franja-urgente{background:#dc2626;}
+
+/* ---------- Barra fija del carrito (solo celular) ---------- */
+/* Aparece abajo cuando el carrito tiene productos: "Ver carrito · 2 productos · S/124". */
+.barra-carrito{display:none;}
+@media (max-width:767px){
+  .barra-carrito{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    position:fixed;
+    left:12px;
+    right:12px;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 12px);
+    z-index:40;
+    min-height:50px;
+    padding:0 16px;
+    border-radius:14px;
+    background:var(--accent);
+    color:#fff;
+    font-size:15px;
+    font-weight:700;
+    text-decoration:none;
+    box-shadow:0 6px 20px rgba(0,0,0,.45);
+    visibility:hidden;
+    transform:translateY(140%);
+    transition:transform .3s ease, visibility 0s linear .3s;
+  }
+  .barra-carrito.ver{visibility:visible;transform:none;transition:transform .3s ease;}
+  /* Con una ficha, un combo o el carrito abiertos (la página queda fija), la barra no va. */
+  body.sin-scroll .barra-carrito{visibility:hidden;transform:translateY(140%);transition:none;}
+  /* Que no tape el pie de página ni las últimas tarjetas, y que el avisito suba. */
+  body.con-barra{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 86px);}
+  body.con-barra .toast{bottom:calc(env(safe-area-inset-bottom, 0px) + 78px);}
+}
+@media (prefers-reduced-motion: reduce){ .barra-carrito, .barra-carrito.ver{transition:none;} }
+
+/* Foto que "vuela" al carrito al agregar un producto (ver volarAlCarrito en app.js). */
+.vuela{
+  position:fixed;
+  z-index:90;
+  width:64px;
+  height:64px;
+  object-fit:cover;
+  border-radius:12px;
+  border:2px solid var(--bone);
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+  pointer-events:none;
+}
