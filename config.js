@@ -146,6 +146,12 @@ const CATALOGO_CONFIG = {
   // dejar su "Avísame". Hoy hay 6 disponibles, así que esto no se nota hasta que se agote uno.
   MAS_VENDIDOS_RELLENO: ['Anillos Demon & Angel Wings Duki', 'Collar Phantom Star'],
 
+  // Al entrar, cada categoría que tenga algo disponible abre como si ya hubieran tocado
+  // "Ocultar agotados" (el botón "Ver agotados" los muestra). Pedido de Alberto el 11-nov-2026
+  // porque hay poco stock y se veían más agotados que productos. Cuando llegue mercadería,
+  // poner false. Una categoría sin NADA disponible sigue mostrando todo (para no quedar vacía).
+  OCULTAR_AGOTADOS_AL_ENTRAR: true,
+
   // Dónde va la sección de Promociones cuando hay combos activos:
   // 'primero' (arriba de Más vendidos) o 'despues-de-mas-vendidos'.
   PROMOS_POSICION: 'despues-de-mas-vendidos',

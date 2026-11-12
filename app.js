@@ -1169,7 +1169,11 @@ function renderGrilla(){
     '<a href="#envios" data-cat="envios">Envíos y pagos</a><a href="#clientes" data-cat="clientes">Clientes</a><a href="#faq" data-cat="faq">Preguntas</a>';
   main.innerHTML = (promosPrimero ? promosHTML + masHTML : masHTML + promosHTML) + grupos.map(g => {
     const hayAgotados = g.items.some(e => !e.disponible);
-    const verAgotados = !ocultarAgotados[g.id];
+    // Al entrar, las categorías con algo disponible abren con los agotados ocultos
+    // (OCULTAR_AGOTADOS_AL_ENTRAR en config.js); una sin nada disponible muestra todo.
+    // Si la persona ya tocó el botón, manda lo que eligió.
+    const porDefecto = !!cfg.OCULTAR_AGOTADOS_AL_ENTRAR && g.items.some(e => e.disponible);
+    const verAgotados = !(g.id in ocultarAgotados ? ocultarAgotados[g.id] : porDefecto);
     return '<section class="cat" id="' + esc(g.id) + '">' +
       '<h2 class="cat-titulo">' + esc(g.nombre) + ' <span class="cat-cuenta">' + g.items.length + '</span></h2>' +
       // Filtro: "En stock" siempre activo (verde); "Ocultar agotados" (rojo) los esconde
@@ -1189,12 +1193,14 @@ function renderGrilla(){
 }
 // Categorías con talla (ahí va el "¿No sabes si te queda?").
 const CON_TALLA = ['cinturones', 'anillos'];
-// Agotados ocultos por categoría (id de la sección -> true). Empieza mostrando todo.
+// Agotados ocultos por categoría (id de la sección -> true/false), SOLO lo que la persona
+// eligió con el botón. Si una categoría no está aquí, vale OCULTAR_AGOTADOS_AL_ENTRAR.
 const ocultarAgotados = {};
 document.getElementById('catalogo').addEventListener('click', e => {
   const b = e.target.closest('[data-agotados]');
   if(!b) return;
-  ocultarAgotados[b.dataset.agotados] = !ocultarAgotados[b.dataset.agotados];
+  // aria-pressed = "se están viendo los agotados": el clic pasa al estado contrario.
+  ocultarAgotados[b.dataset.agotados] = b.getAttribute('aria-pressed') === 'true';
   renderGrilla();
 });
 
