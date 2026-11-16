@@ -150,7 +150,7 @@ const CATALOGO_CONFIG = {
   // "Ocultar agotados" (el botón "Ver agotados" los muestra). Pedido de Alberto el 11-nov-2026
   // porque hay poco stock y se veían más agotados que productos. Cuando llegue mercadería,
   // poner false. Una categoría sin NADA disponible sigue mostrando todo (para no quedar vacía).
-  OCULTAR_AGOTADOS_AL_ENTRAR: true,
+  OCULTAR_AGOTADOS_AL_ENTRAR: false,
 
   // Dónde va la sección de Promociones cuando hay combos activos:
   // 'primero' (arriba de Más vendidos) o 'despues-de-mas-vendidos'.
@@ -228,7 +228,7 @@ const CATALOGO_CONFIG = {
   },
 
   // Productos que NO muestran "Restock en camino" aunque el dashboard lo diga (salen como Agotado).
-  SIN_AVISO_RESTOCK: ['Pant Chain Chrome Hearts'],
+  SIN_AVISO_RESTOCK: [],
 
   // Botoncito extra al inicio de los avisos del inicio (antes de "Puntos de recojo sin costo").
   // Sale solo hasta "hasta" y mientras el producto esté disponible.

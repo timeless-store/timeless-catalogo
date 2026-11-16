@@ -1155,6 +1155,8 @@ details.datos-form .opc{font-weight:500;color:var(--muted);}
 .cant-ficha button[disabled]{background:var(--chip);color:var(--muted);cursor:not-allowed;}
 .cant-ficha span{font-size:14px;}
 .btn-restock{background:var(--warn);border-color:var(--warn);color:#111;margin-top:10px;}
+.cintura-clave{display:block;font-size:16px;font-weight:800;margin-bottom:2px;}
+.talla-linea{display:block;}
 .nota-316{display:block;margin-top:4px;font-size:12px;color:var(--muted);}
 .frase-talla .dm-link{
   background:none;border:0;padding:0;cursor:pointer;font:inherit;

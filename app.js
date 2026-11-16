@@ -1929,10 +1929,9 @@ function indiceGaleria(){
 function tallasCinturonHTML(t, nombre){
   const m = String(t || '').match(/^\s*(\d+)\s*[–-]\s*(\d+)\s*(?:aprox\.?)?\s*(?:\(\s*(\d+)\s*[–-]\s*(\d+)\s*cm[^)]*\))?/i);
   if(!m) return esc(t);
-  return '<b>Sirve para las tallas ' + m[1] + ' a ' + m[2] + '</b> <span class="aprox">(aprox.)</span>' +
-    '<span class="nota-316">' + (m[3]
-      ? 'Entra en cinturas de ' + m[3] + ' a ' + m[4] + ' cm. Es UN solo cinturón que agarra esas tallas: no tienes que elegir talla.'
-      : 'Es UN solo cinturón para todas esas tallas: no tienes que elegir talla.') + '</span>';
+  return (m[3] ? '<b class="cintura-clave">Entra en cinturas de ' + m[3] + ' a ' + m[4] + ' cm</b>' : '') +
+    '<span class="talla-linea">Talla de pantalón: <b>' + m[1] + ' a ' + m[2] + '</b> <span class="aprox">(aprox.)</span></span>' +
+    '<span class="nota-316">Es UN solo cinturón que agarra todas esas tallas: no tienes que elegir talla.</span>';
 }
 function renderFicha(indice){
   const e = ENTRADA_POR_ID[fichaEntradaId];
@@ -1994,7 +1993,7 @@ function renderFicha(indice){
         // En cinturones la talla es la del pantalón (así está en el Canva), con
         // una "?" que explica cómo medirse; en el resto, "Tallas" a secas.
         (esCinturon && p.tallas
-          ? '<div class="dato"><dt>Tallas de pantalón ' + infoHTML('¿Cómo saber tu talla?', '<b>¿Cómo saber tu talla?</b>' + guia) + '</dt><dd>' + tallasCinturonHTML(p.tallas, p.nombre) + '</dd></div>'
+          ? '<div class="dato"><dt>Talla y medidas ' + infoHTML('¿Cómo saber tu talla?', '<b>¿Cómo saber tu talla?</b>' + guia) + '</dt><dd>' + tallasCinturonHTML(p.tallas, p.nombre) + '</dd></div>'
           : dato('Tallas', p.tallas)) +
         (p.material
           ? '<div class="dato"><dt>Material</dt><dd>' + esc(p.material) +
