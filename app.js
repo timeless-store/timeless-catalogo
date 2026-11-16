@@ -873,7 +873,9 @@ function estadoCombo(x, ahora){
           disponible: casilleros.every(ops => ops.some(p => p.disponible)),
           normal: elegidos.reduce((a, p) => a + p.precio, 0),
           // Envío gratis si alguna opción lo trae (el cinturón premium, en estos combos).
-          gratis: casilleros.some(ops => ops.length && ops.every(p => p.envioGratis))};
+          gratis: casilleros.some(ops => ops.length && ops.every(p => p.envioGratis)),
+          // Menos unidades que quedan entre los productos fijos del combo (0 = sin dato).
+          quedan: Math.min.apply(null, casilleros.filter(ops => ops.length === 1 && ops[0].disponible && ops[0].quedan).map(ops => ops[0].quedan).concat([99])) % 99};
 }
 // Tarjeta del combo en la página: la foto del combo (la del Canva), precio y "Arma tu combo".
 // Lo que costarían las opciones sin promo, de la más barata a la más cara (para
@@ -905,7 +907,7 @@ function comboHTML(x, ahora){
   }
   return '<a class="combo' + (st.disponible ? '' : ' combo-agotado') + '" href="#/combo/' + x.i + '">' +
     '<div class="combo-foto"><img loading="lazy" src="' + esc(foto) + '" alt="' + esc(x.pr.nombre) + '">' +
-      (st.disponible ? '' : '<div class="tags"><span class="tag tag-agotado">Agotado</span></div>') + '</div>' +
+      (st.disponible ? (st.quedan ? '<div class="tags"><span class="tag tag-pocos">' + textoQuedan(st.quedan, false) + '</span></div>' : '') : '<div class="tags"><span class="tag tag-agotado">Agotado</span></div>') + '</div>' +
     '<div class="combo-cuerpo">' +
       '<div class="combo-nombre">' + esc(x.pr.nombre) + '</div>' +
       '<div class="precios">' + (rn.max > x.pr.valor ? '<span class="precio-antes">' + fmtRango(rn.min, rn.max) + '</span>' : '') +
@@ -946,6 +948,7 @@ function renderCombo(){
       '<h2>' + esc(x.pr.nombre) + '</h2>' +
       '<div class="ficha-precios"><div class="precios"><span class="precio-oferta">' + fmtPrecio(x.pr.valor) + '</span>' +
         (st.completo && st.normal > x.pr.valor ? '<span class="precio-antes">' + fmtPrecio(st.normal) + '</span>' : '') + '</div></div>' +
+      (st.disponible && st.quedan ? '<div class="pocos">' + textoQuedan(st.quedan, true) + '</div>' : '') +
       (st.gratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Con envío gratis</div>' : '') +
       (x.pr.hasta ? '<div class="cuenta ficha-cuenta">Termina en <b class="mono" data-hasta="' + x.pr.hasta + '">' + fmtCuenta(x.pr.hasta - ahora) + '</b></div>' : '') +
       st.casilleros.map((ops, s) => {
