@@ -154,7 +154,7 @@ const CATALOGO_CONFIG = {
 
   // Dónde va la sección de Promociones cuando hay combos activos:
   // 'primero' (arriba de Más vendidos) o 'despues-de-mas-vendidos'.
-  PROMOS_POSICION: 'despues-de-mas-vendidos',
+  PROMOS_POSICION: 'primero',
 
   // Minutos que la cuenta de una promo se queda en 00:00:00 ("Promo terminada")
   // antes de que desaparezca todo lo de promos.
