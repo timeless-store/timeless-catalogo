@@ -245,6 +245,12 @@ const CATALOGO_CONFIG = {
   // que no está en esta lista, igual se muestra, al final.
   CATEGORIAS: ['Cinturones', 'Anillos', 'Collares', 'Pant chains', 'Lentes'],
 
+  // Orden AUTOMÁTICO de las secciones según lo disponible (regla de Alberto, 16-nov-2026):
+  // con COLLARES_PRIMERO_DESDE collares disponibles o más, Collares va primero; si hay pant chains
+  // disponibles suben; una sección sin nada disponible baja al final. false = usar CATEGORIAS tal cual.
+  ORDEN_SECCIONES_AUTO: true,
+  COLLARES_PRIMERO_DESDE: 3,
+
   // Frase con la que cierra cada categoría y cada ficha (la misma del Canva).
   FRASE_TALLA: '¿No sabes si te queda? Escríbenos por DM y te ayudamos a elegir tu talla',
 

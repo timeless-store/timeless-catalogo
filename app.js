@@ -707,8 +707,30 @@ function cargar(){
 // esté en esa lista igual aparece, al final. Dentro de cada una van primero los
 // que hay, luego los que llegan pronto y al final los agotados (respetando el
 // orden de la hoja entre iguales), para que lo que se puede comprar se vea primero.
+// Orden de las secciones. Con ORDEN_SECCIONES_AUTO (config.js) se arma solo según lo que hay
+// disponible (regla de Alberto, 16-nov-2026):
+//   - Con COLLARES_PRIMERO_DESDE collares disponibles o más (3), Collares va primero; si no, Cinturones.
+//   - Con pocos collares: Cinturones, Anillos, [Pant chains si hay alguna], Collares, [Pant chains si no hay].
+//   - Con muchos collares: Collares, Cinturones, y luego Pant chains antes que Anillos si hay pant chains.
+//   - Una sección sin nada disponible siempre baja al final.
+// Sin ORDEN_SECCIONES_AUTO se usa CATEGORIAS tal cual.
+function ordenSecciones(grupos){
+  const fijo = (cfg.CATEGORIAS || []).map(norm);
+  if(!cfg.ORDEN_SECCIONES_AUTO) return fijo;
+  const k = n => Object.keys(grupos).find(x => x === norm(n)) || norm(n);
+  const hay = n => { const g = grupos[k(n)]; return g ? g.items.filter(e => e.disponible).length : 0; };
+  const C = k('Collares'), T = k('Cinturones'), A = k('Anillos'), P = k('Pant chains');
+  const muchosCollares = hay('Collares') >= (cfg.COLLARES_PRIMERO_DESDE || 3);
+  const conPant = hay('Pant chains') > 0;
+  let lista = muchosCollares
+    ? (conPant ? [C, T, P, A] : [C, T, A, P])
+    : (conPant ? [T, A, P, C] : [T, A, C, P]);
+  // Las que no están en esta regla (Lentes, otras nuevas) van después, en el orden de CATEGORIAS.
+  lista = lista.concat(fijo.filter(x => lista.indexOf(x) === -1));
+  // Sin nada disponible: al final (sin cambiar el orden entre ellas).
+  return lista.filter(x => hay(x) > 0).concat(lista.filter(x => !(hay(x) > 0)));
+}
 function agrupar(){
-  const orden = (cfg.CATEGORIAS || []).map(norm);
   const grupos = {};
   TARJETAS.forEach((e, i) => {
     const k = norm(e.categoria);
@@ -723,6 +745,7 @@ function agrupar(){
     grupos[k].items.sort((a, b) => (rangoEstado(a.e) - rangoEstado(b.e)) || (ord(a) - ord(b)) || (a.i - b.i));
     grupos[k].items = grupos[k].items.map(x => x.e);
   });
+  const orden = ordenSecciones(grupos);
   // Si no queda ningún anillo disponible, la sección baja después de "Pant chains".
   const pos = k => {
     const i = orden.indexOf(k);
