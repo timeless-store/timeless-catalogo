@@ -232,7 +232,7 @@ const CATALOGO_CONFIG = {
 
   // Botoncito extra al inicio de los avisos del inicio (antes de "Puntos de recojo sin costo").
   // Sale solo hasta "hasta" y mientras el producto esté disponible.
-  AVISO_CHIP: {producto: 'Anillos Demon & Angel Wings Duki', texto: 'Volvieron los anillos Duki 🖤', hasta: '2026-11-04 23:59'},
+  AVISO_CHIP: {producto: 'Anillos Demon & Angel Wings Duki', texto: 'Volvieron los anillos Duki 🖤', hasta: '2026-12-02 23:59'},
 
   // Líneas dentro de una categoría (columna "Linea" de la hoja). Se muestran como
   // etiqueta en la tarjeta (con esta descripción al pasar el cursor) y en la ficha.
