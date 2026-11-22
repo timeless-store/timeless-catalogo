@@ -49,17 +49,29 @@ const CATALOGO_CONFIG = {
   // Para verla de prueba sin prenderla: abrir la página con ?franja=prueba al final.
   FRANJA: {
     activa: true,
-    texto: 'CYBER WOW · Hasta -20% de descuento en el catálogo · Del 2 al 6 de noviembre',
-    desde: '2026-11-01 00:00',
-    hasta: '2026-11-06 23:59',
+    texto: 'BLACK FRIDAY · Hasta -30% · Del 27/11 al 02/12 · ¿Tienes acceso anticipado? Ingresa tu código',
+    desde: '2026-11-21 00:00',
+    hasta: '2026-12-02 23:59',
     // Etapas: desde cada fecha cambia el texto (y el fin). urgente = franja roja.
     etapas: [
-      {desde: '2026-11-06 21:00', hasta: '2026-11-07 23:59',
-       texto: 'CYBER WOW · ¡Se extiende 1 día más! · Hasta -20% de descuento en el catálogo · Del 2 al 7 de noviembre'},
-      {desde: '2026-11-07 00:00', urgente: true,
-       texto: 'ÚLTIMO DÍA DEL CYBER WOW · Hasta -20% de descuento en el catálogo · Solo hoy sábado 7 hasta las 11:59 pm'},
+      {desde: '2026-11-26 00:00',
+       texto: 'BLACK FRIDAY · Empieza mañana viernes 27 a las 12:00 a.m. · Hasta -30% de descuento'},
+      // soloAcceso: esta etapa la ve únicamente quien ya puso el código (los demás ven la de arriba).
+      {desde: '2026-11-26 00:00', soloAcceso: true,
+       texto: 'ACCESO ANTICIPADO ACTIVO · Black Friday para todos desde mañana viernes 27'},
+      {desde: '2026-11-27 00:00',
+       texto: 'BLACK FRIDAY · Hasta -30% de descuento en el catálogo · Hasta el miércoles 02/12'},
+      {desde: '2026-12-02 00:00', urgente: true,
+       texto: 'ÚLTIMO DÍA DEL BLACK FRIDAY · Hasta -30% · Solo hoy hasta las 11:59 pm'},
     ],
   },
+
+  // Acceso anticipado al Black Friday (código). Un solo lugar para todas las fechas (hora de Lima).
+  // El código se compara sin mayúsculas ni espacios. Es PÚBLICO en el código fuente (Alberto lo aceptó).
+  //  - botonDesde / hasta: cuándo se ve el botón "Ingresar código" en la portada.
+  //  - activaDesde: desde esa hora el código sí da los precios del Black Friday.
+  //  (el Black Friday para todos empieza en CAMPANA_PRECIOS.desde)
+  ACCESO_ANTICIPADO: {codigo: 'TIMELESSVIP', botonDesde: '2026-11-21 00:00', activaDesde: '2026-11-26 00:00', hasta: '2026-11-27 00:00'},
 
   // ---------- ENVÍOS ----------
   // Solo enviamos dentro del Perú. Los costos son APROXIMADOS: se confirman por chat.
@@ -156,6 +168,10 @@ const CATALOGO_CONFIG = {
   // 'primero' (arriba de Más vendidos) o 'despues-de-mas-vendidos'.
   PROMOS_POSICION: 'primero',
 
+  // true = un combo que no se puede armar (algo agotado) desaparece de la sección, en vez de
+  // mostrarse como "Agotado: mira los otros combos". Si no queda ninguno, la sección se va.
+  PROMOS_OCULTAR_AGOTADOS: true,
+
   // Minutos que la cuenta de una promo se queda en 00:00:00 ("Promo terminada")
   // antes de que desaparezca todo lo de promos.
   PROMO_GRACIA_MIN: 5,
@@ -166,7 +182,7 @@ const CATALOGO_CONFIG = {
   PROMOS_TITULO: '',
   PROMOS_ETIQUETA: '',                           // arriba del título al abrir un combo (vacío = "Promoción")
   PROMOS_HERO: '',                                // botón grande del inicio (vacío = "🔥 Promos disponibles")
-  PROMOS_HERO_SUB: 'Combo cinturón premium + collar con envío gratis desde S/79',    // primera parte de la línea de abajo del botón (vacío = solo la fecha)
+  PROMOS_HERO_SUB: 'Combos con cinturón premium y envío gratis',    // primera parte de la línea de abajo del botón (vacío = solo la fecha)
   PROMOS_SUBTITULO: 'Envío gratis en estos combos. Toca un combo para ver las fotos y videos de cada producto y agrégalo al carrito: el precio de la promo se aplica solo.',
 
   // Solo para la página de PRUEBAS: muestra las promos aunque todavía no llegue su
@@ -181,17 +197,10 @@ const CATALOGO_CONFIG = {
   //   {desde: '2026-11-01 00:00', hasta: '2026-11-0X 23:59', foto: 'img/promos/hero-cyberwow-v2.jpg'},
   // Se usa la PRIMERA de la lista que esté vigente (por eso las más cortas van antes).
   HERO_FOTOS: [
-    {desde: '2026-10-25 00:00', hasta: '2026-10-31 23:59',
-     foto: 'img/promos/hero-halloween-pc.jpg', fotoCel: 'img/promos/hero-halloween-cel.jpg'},
-    // Cyber Wow +1 día: desde el anuncio (viernes 6, 9 pm) dice "Del 02/11 al 07/11".
-    {desde: '2026-11-06 21:00', hasta: '2026-11-07 00:00',
-     foto: 'img/promos/hero-cyberwow-ext-pc.jpg', fotoCel: 'img/promos/hero-cyberwow-ext-cel.jpg'},
-    // Sábado 7: "ÚLTIMO DÍA · HOY 07/11" en rojo.
-    {desde: '2026-11-07 00:00', hasta: '2026-11-07 23:59',
-     foto: 'img/promos/hero-cyberwow-ultimo-pc.jpg', fotoCel: 'img/promos/hero-cyberwow-ultimo-cel.jpg'},
-    {desde: '2026-11-01 00:00', hasta: '2026-11-06 23:59',
-     foto: 'img/promos/hero-cyberwow-pc.jpg', fotoCel: 'img/promos/hero-cyberwow-v2.jpg'},
-    // Después del Cyber: el logo clásico de Timeless en negro (hasta la próxima campaña).
+    // Black Friday: banner desde el 21/11 (cuando aparece el botón del código) hasta el 02/12.
+    {desde: '2026-11-21 00:00', hasta: '2026-12-02 23:59',
+     foto: 'img/promos/hero-blackfriday-pc.jpg', fotoCel: 'img/promos/hero-blackfriday-cel.jpg'},
+    // Antes y después de una campaña: el logo clásico de Timeless en negro.
     {desde: '2026-11-07 23:59', hasta: '2027-12-31 23:59',
      foto: 'img/promos/hero-logo-pc.jpg', fotoCel: 'img/promos/hero-logo-cel.jpg'},
   ],
@@ -202,36 +211,52 @@ const CATALOGO_CONFIG = {
   // de productos.csv (aunque la campaña ya haya terminado), por eso entre campañas se deja vacío.
   // Opcional: ampliacion: {anuncio: 'AAAA-MM-DD HH:MM', hasta: 'AAAA-MM-DD HH:MM'} (extiende la
   // campaña desde esa hora). El Cyber Wow (2 al 7 de noviembre de 2026) ya terminó: vacío.
-  CAMPANA_PRECIOS: {desde: '', hasta: '', precios: {}},
+  // Black Friday 2026: los precios SOLO valen entre "desde" y "hasta"; antes y después cada producto
+  // usa su PrecioOferta normal de productos.csv. Con el código de ACCESO_ANTICIPADO empiezan
+  // desde activaDesde (26/11 00:00) en vez de "desde". "etiqueta" = texto de la etiqueta del producto.
+  CAMPANA_PRECIOS: {desde: '2026-11-27 00:00', hasta: '2026-12-02 23:59', etiqueta: 'BLACK FRIDAY', precios: {
+    'Cinturón Dark Knight': 30, 'Cinturón Black Cross Deluxe': 59, 'Cinturón Chrome Hearts': 30,
+    'Cinturón Redglow': 24, 'Cinturón Darkglow': 24, 'Cinturón White Spider': 59,
+    'Cinturón Iced Silver Y2K': 39, 'Cinturón Iced Black Y2K': 39,
+    'Collar Demon Cross': 18, 'Collar Gothic Cross': 18, 'Collar Phantom Star': 22, 'Collar Starboy': 15,
+    'Collar Gothic Pearls': 25, 'Collar Shadow Cross': 25,
+    'Anillos Demon & Angel Wings Duki': 18,
+    'Pant Chain Spiderboy': 29, 'Pant Chain Y2K Pearls': 29, 'Pant Chain Skeleton': 30, 'Pant Chain Chrome Hearts': 30,
+  }},
 
-  // Botón azul del inicio mientras dura el Cyber Wow (sale cuando no hay combos de promos).
-  CAMPANA_HERO: {desde: '2026-11-01 00:00', hasta: '2026-11-06 23:59',
-    titulo: '⚡ CYBER WOW', sub: 'Hasta -20% de descuento · Del 2 al 6 de noviembre', boton: 'Ver catálogo →',
-    ir: 'cat-mas-vendidos', eyebrow: 'Cyber Wow 2026',
+  // Botón azul del inicio mientras dura el Black Friday (sale cuando no hay combos de promos).
+  CAMPANA_HERO: {desde: '2026-11-22 00:00', hasta: '2026-12-02 23:59',
+    titulo: '🖤 BLACK FRIDAY', sub: 'Hasta -30% · Del 27/11 al 02/12', boton: 'Ver catálogo →',
+    ir: 'cat-mas-vendidos', eyebrow: 'Black Friday 2026',
     etapas: [
-      {desde: '2026-11-06 21:00', hasta: '2026-11-07 23:59', sub: '¡1 día más! · Hasta -20% · Del 2 al 7 de noviembre'},
-      {desde: '2026-11-07 00:00', urgente: true, titulo: '⚡ CYBER WOW · ÚLTIMO DÍA', sub: 'Hasta -20% · Solo hoy hasta las 11:59 pm'},
+      {desde: '2026-11-27 00:00', sub: 'Hasta -30% en el catálogo · Hasta el 02/12'},
+      {desde: '2026-12-02 00:00', urgente: true, titulo: '🖤 BLACK FRIDAY · ÚLTIMO DÍA', sub: 'Hasta -30% · Solo hoy hasta las 11:59 pm'},
     ]},
 
   // Lanzamientos programados (NEW DROP). El producto debe estar en productos.csv con
   // Disponible = PRONTO y Visible = SI: antes de "desde" se ve oscuro con las fotos y
   // "Sale hoy a las 6:00 pm", y a esa hora sale solo (la página se recarga sola).
   // Hasta "hasta" lleva la etiqueta NEW DROP (vacío = 7 días).
-  LANZAMIENTOS: {
-    'Cinturón Black Cross Deluxe': {desde: '2026-10-29 18:00', hasta: '2026-11-05 23:59'},
-  },
+  LANZAMIENTOS: {},
 
   // Etiqueta roja temporal sobre un producto, solo entre sus fechas (hora de Lima).
-  // Sábado 7-nov: último día del Cyber Wow en el Dark Knight. Se apaga sola a las 11:59 pm.
-  ETIQUETAS_TEMP: {
-    'Cinturón Dark Knight': {texto: 'ÚLTIMO DÍA DE CYBER', desde: '2026-11-07 00:00', hasta: '2026-11-07 23:59'},
-  },
+  // Ejemplo: 'Cinturón Dark Knight': {texto: 'ÚLTIMO DÍA', desde: 'AAAA-MM-DD HH:MM', hasta: 'AAAA-MM-DD HH:MM'}
+  ETIQUETAS_TEMP: {},
 
   // Productos que NO muestran "Restock en camino" aunque el dashboard lo diga (salen como Agotado).
   SIN_AVISO_RESTOCK: [],
 
+  // Productos que NO salen como disponibles hasta esa hora (Lima), aunque el Excel ya tenga stock.
+  // Antes se ven como estaban (agotados). Collares Duki: salen el jueves 03/12 a las 6:00 pm, a
+  // precio normal (no están en el Black Friday). Pedido de Alberto el 21-nov-2026.
+  RETENER_HASTA: {
+    'Collar Ameri Duki': '2026-12-03 18:00',
+    'Collar Angel y Demon Wings Duki': '2026-12-03 18:00',
+  },
+
   // Botoncito extra al inicio de los avisos del inicio (antes de "Puntos de recojo sin costo").
   // Sale solo hasta "hasta" y mientras el producto esté disponible.
+  // Ejemplo: {producto: 'Nombre exacto', texto: 'Volvieron los anillos Duki 🖤', hasta: 'AAAA-MM-DD HH:MM'}
   AVISO_CHIP: {producto: 'Anillos Demon & Angel Wings Duki', texto: 'Volvieron los anillos Duki 🖤', hasta: '2026-12-02 23:59'},
 
   // Líneas dentro de una categoría (columna "Linea" de la hoja). Se muestran como

@@ -1490,9 +1490,53 @@ html.sin-scroll{overflow:hidden;}
 /* Cyber Wow: etiqueta y botón azules (el mismo azul de "Arma tu combo") */
 .tag-cyber{background:#2563eb;color:#fff;box-shadow:0 0 12px rgba(37,99,235,.7);}
 .hero-promo.hero-cyber{background:var(--accent);}
+/* % de descuento de la campaña: va debajo de la etiqueta "BLACK FRIDAY" (tag-salto parte la línea) */
+.tag-salto{flex-basis:100%;height:0;}
+.tag-pct{background:#2563eb;color:#fff;box-shadow:0 0 12px rgba(37,99,235,.7);}
+.ficha-precios:has(.tag-pct){display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 /* Último día de la campaña: botón y franja en rojo */
+/* Black Friday activo: el botón palpita más fuerte (azul; rojo el último día). */
+.hero-promo.hero-pulso{animation:pulso-bf 1.6s ease-in-out infinite;}
+.hero-promo.hero-pulso.hero-urgente{animation-name:pulso-bf-rojo;}
+@keyframes pulso-bf{0%,100%{transform:scale(1);box-shadow:0 6px 18px rgba(37,99,235,.35);}50%{transform:scale(1.03);box-shadow:0 0 30px rgba(59,130,246,.75);}}
+@keyframes pulso-bf-rojo{0%,100%{transform:scale(1);box-shadow:0 6px 18px rgba(220,38,38,.4);}50%{transform:scale(1.03);box-shadow:0 0 30px rgba(239,68,68,.8);}}
+@media (prefers-reduced-motion: reduce){ .hero-promo.hero-pulso{animation:none;} }
 .hero-promo.hero-cyber.hero-urgente{background:#dc2626;box-shadow:0 0 22px rgba(220,38,38,.55);}
 .franja.franja-urgente{background:#dc2626;}
+
+/* Black Friday: botón "Ingresar código" del inicio y su ventana */
+.hero-codigo{
+  display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;margin-top:12px;
+  padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:#0b0b0b;color:#fff;
+  font:inherit;cursor:pointer;
+}
+.hero-codigo-titulo{font-size:16px;font-weight:800;}
+.hero-codigo-sub{font-size:12px;font-weight:600;opacity:.75;}
+.hero-codigo:active{transform:scale(.97);}
+.sheet-codigo{max-width:420px;}
+.codigo-txt{margin:0 0 12px;color:var(--muted, #aaa);font-size:14px;}
+.codigo-input{
+  width:100%;box-sizing:border-box;padding:14px;border-radius:12px;border:1px solid var(--line);
+  background:var(--chip);color:var(--bone);font-size:16px;letter-spacing:.08em;text-transform:uppercase;
+}
+.codigo-msg{margin-top:12px;font-size:14px;font-weight:600;line-height:1.4;}
+.codigo-msg:empty{display:none;}
+.codigo-pide{margin:16px 0 0;font-size:14px;color:var(--muted, #aaa);text-align:center;}
+.codigo-pide-btn{background:none;border:0;padding:0;font:inherit;font-weight:800;color:var(--accent-txt);text-decoration:underline;cursor:pointer;}
+.codigo-canales{display:flex;gap:8px;margin-top:10px;}
+.codigo-canales[hidden]{display:none;}
+.codigo-canales .btn{flex:1;text-align:center;}
+/* Confeti corto al activar el acceso: no tapa ni bloquea nada */
+.confeti{position:fixed;inset:0;z-index:200;pointer-events:none;overflow:hidden;}
+.confeti i{position:absolute;top:-12px;width:8px;height:14px;border-radius:2px;opacity:0;animation:confeti-cae 1.5s ease-in forwards;}
+@keyframes confeti-cae{
+  0%{opacity:1;transform:translate3d(0,0,0) rotate(0);}
+  85%{opacity:1;}
+  100%{opacity:0;transform:translate3d(var(--dx),105vh,0) rotate(var(--giro));}
+}
+@media (prefers-reduced-motion: reduce){ .confeti{display:none;} }
+.codigo-ok{color:#4ade80;}
+.codigo-mal{color:#f87171;}
 
 /* ---------- Barra fija del carrito (solo celular) ---------- */
 /* Aparece abajo cuando el carrito tiene productos: "Ver carrito · 2 productos · S/124". */

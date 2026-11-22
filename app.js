@@ -108,6 +108,7 @@ function etapaDe(obj, ahora){
   let r = obj;
   (obj.etapas || []).forEach(e => {
     const d = parseFechaLima(e.desde);
+    if(e.soloAcceso && !tieneAcceso(ahora)) return;   // etapa solo para quien ya puso el código
     if(d && !isNaN(d) && ahora >= d){ r = Object.assign({}, r, e); r.desde = obj.desde; }
   });
   return r;
@@ -201,10 +202,12 @@ function filasAProductos(rows){
       nombre: nombre,
       categoria: col(r, 'categoria') || 'Otros',
       precio: parseMoney(col(r, 'precio')),
-      precioOferta: camp ? camp.precio : parseMoney(col(r, 'preciooferta')),
-      ofertaHasta: camp ? camp.hasta : parseFechaLima(col(r, 'ofertahasta')),
-      ofertaDesde: camp ? camp.desde : 0,
-      cyber: !!camp,
+      // Oferta normal del CSV. El precio de la campaña (Black Friday) va aparte en "camp" y
+      // solo manda dentro de sus fechas (ver ofertaDe): antes y después vale esta oferta.
+      precioOferta: parseMoney(col(r, 'preciooferta')),
+      ofertaHasta: parseFechaLima(col(r, 'ofertahasta')),
+      ofertaDesde: 0,
+      camp: camp,
       // Solo se marca agotado con un NO explícito. Una celda vacía cuenta como disponible.
       disponible: !pronto && !restock && ['no', 'agotado', '0', 'false', 'falso'].indexOf(disp) === -1,
       proximamente: pronto,
@@ -254,6 +257,10 @@ function filasAProductos(rows){
 const ESTADO_KEY = 'timeless_catalogo_estado';
 const RANGO_ESTADO = {'en stock': 0, 'quedan pocos': 1, 'restock en camino': 2, 'agotado': 3, 'oculto': 4};
 let sinEmpatar = [];   // productos que no se encontraron en la lista (para revisar)
+function retenidoHasta(nombre){
+  const t = parseFechaLima((cfg.RETENER_HASTA || {})[nombre]);
+  return t && !isNaN(t) ? t : null;
+}
 function aplicarEstado(productos, filas){
   sinEmpatar = [];
   if(!filas || filas.length < 2) return;
@@ -286,6 +293,10 @@ function aplicarEstado(productos, filas){
       p.proximamente = false;
       p.visible = p.visible && (est !== 'oculto' || p.visibleSi);
     }
+    // RETENER_HASTA (config.js): no sale como disponible antes de esa hora aunque el Excel ya
+    // diga que hay stock (se queda como agotado, como estaba). A esa hora la página se recarga sola.
+    const ret = retenidoHasta(p.nombre);
+    if(ret && Date.now() < ret){ p.disponible = false; p.pocos = false; p.quedan = 0; }
     // Orden = qué tan rápido se vende dentro de su categoría (1 = el más rápido).
     // El par de anillos son dos filas: vale la menor.
     const ordenes = suyas.map(f => f.orden).filter(n => n > 0);
@@ -386,17 +397,66 @@ function rangoEstado(e){ return e.lanzamiento ? -1 : e.disponible ? 0 : (e.proxi
 // - Con PrecioOferta y sin fecha: oferta sin fecha de fin (sin cuenta regresiva).
 // - Con fecha mal escrita: NO se aplica. Es preferible cobrar el precio normal
 //   a regalar un descuento por un error de tipeo.
-function ofertaActiva(p, ahora){
-  if(!(p.precioOferta > 0 && p.precioOferta < p.precio)) return false;
-  if(p.ofertaDesde && ahora < p.ofertaDesde) return false;   // campaña que todavía no empieza
+function ofertaActiva(p, ahora){ return !!ofertaDe(p, ahora); }
+// La oferta que vale AHORA para un producto: {precio, hasta, campana} o null.
+// 1) Si está en CAMPANA_PRECIOS (Black Friday) y estamos dentro de las fechas de la campaña, manda ese
+//    precio. Con el código de acceso anticipado, la campaña empieza antes (ACCESO_ANTICIPADO.activaDesde).
+// 2) Si no, vale la oferta normal de productos.csv (PrecioOferta / OfertaHasta).
+function ofertaDe(p, ahora){
+  const c = p.camp;
+  if(c && c.precio > 0 && c.precio < p.precio){
+    let ini = c.desde;
+    if(tieneAcceso(ahora)){
+      const av = parseFechaLima(cfg.ACCESO_ANTICIPADO.activaDesde);
+      if(av && !isNaN(av) && av < ini) ini = av;
+    }
+    if(ahora >= ini && ahora < c.hasta) return {precio: c.precio, hasta: c.hasta, campana: true};
+  }
+  if(!(p.precioOferta > 0 && p.precioOferta < p.precio)) return null;
+  if(p.ofertaDesde && ahora < p.ofertaDesde) return null;
   // Un agotado no muestra una oferta sin fecha de fin: así nadie espera que
   // vuelva a ese precio. Con fecha (máx. 2 días después de agotarse), sí.
-  if(!p.disponible && p.ofertaHasta === null) return false;
-  if(p.ofertaHasta === null) return true;
-  if(isNaN(p.ofertaHasta)) return false;
-  return ahora < p.ofertaHasta;
+  if(!p.disponible && p.ofertaHasta === null) return null;
+  if(p.ofertaHasta === null) return {precio: p.precioOferta, hasta: null, campana: false};
+  if(isNaN(p.ofertaHasta)) return null;
+  return ahora < p.ofertaHasta ? {precio: p.precioOferta, hasta: p.ofertaHasta, campana: false} : null;
 }
-function precioVigente(p, ahora){ return ofertaActiva(p, ahora) ? p.precioOferta : p.precio; }
+function precioVigente(p, ahora){ const o = ofertaDe(p, ahora); return o ? o.precio : p.precio; }
+// % de descuento (redondeado) SOLO cuando el precio que vale ahora es el de la campaña; si no, 0.
+function pctCampana(p, ahora){
+  const o = ofertaDe(p, ahora);
+  return o && o.campana && p.precio > 0 ? Math.round((p.precio - o.precio) / p.precio * 100) : 0;
+}
+function etiquetaCampana(){ return (cfg.CAMPANA_PRECIOS && cfg.CAMPANA_PRECIOS.etiqueta) || 'CYBER WOW'; }
+
+/* ---------- Acceso anticipado al Black Friday (ACCESO_ANTICIPADO en config.js) ---------- */
+const VIP_KEY = 'timeless_catalogo_vip';
+let vipGuardado = false;
+try { vipGuardado = localStorage.getItem(VIP_KEY) === '1'; } catch(e) {}
+function fechaAcceso(clave){ const a = cfg.ACCESO_ANTICIPADO; const t = a && parseFechaLima(a[clave]); return t && !isNaN(t) ? t : null; }
+// El código se compara sin mayúsculas ni espacios.
+function codigoValido(txt){
+  const a = cfg.ACCESO_ANTICIPADO;
+  const limpio = s => String(s == null ? '' : s).replace(/\s+/g, '').toLowerCase();
+  return !!(a && a.codigo) && limpio(txt) === limpio(a.codigo);
+}
+// ¿Esta persona tiene el acceso anticipado activo ahora mismo? (código guardado + ya llegó la hora)
+function tieneAcceso(ahora){
+  const ini = fechaAcceso('activaDesde'), fin = fechaAcceso('hasta');
+  return vipGuardado && ini !== null && ahora >= ini && (fin === null || ahora < fin);
+}
+// ¿Esta persona ya ve los precios del Black Friday? (desde el inicio público o con su acceso anticipado)
+// Mientras tanto el botón azul de la portada "palpita" (clase hero-pulso).
+function bfActivo(ahora){
+  const c = cfg.CAMPANA_PRECIOS || {}, d = parseFechaLima(c.desde), h = parseFechaLima(c.hasta);
+  if(d === null || h === null || isNaN(d) || isNaN(h) || ahora > h) return false;
+  return ahora >= d || tieneAcceso(ahora);
+}
+// ¿Se ve el botón "Ingresar código" en la portada?
+function botonCodigoVisible(ahora){
+  const d = fechaAcceso('botonDesde'), h = fechaAcceso('hasta');
+  return d !== null && h !== null && ahora >= d && ahora < h && !tieneAcceso(ahora);
+}
 
 // Foto para miniaturas: la primera que no sea video (propia, o de su grupo).
 function fotoEntrada(e){ return e.fotos.find(f => !esVideo(f)) || FOTO_VACIA; }
@@ -414,16 +474,18 @@ function fmtCuenta(ms){
 }
 
 function preciosHTML(p, ahora){
-  if(ofertaActiva(p, ahora)){
+  const o = ofertaDe(p, ahora);
+  if(o){
     return '<div class="precios"><span class="precio-antes">' + fmtPrecio(p.precio) + '</span>' +
-           '<span class="precio-oferta">' + fmtPrecio(p.precioOferta) + '</span></div>';
+           '<span class="precio-oferta">' + fmtPrecio(o.precio) + '</span></div>';
   }
   return '<div class="precios"><span class="precio">' + fmtPrecio(p.precio) + '</span></div>';
 }
 function cuentaHTML(p, ahora, clase){
-  if(!ofertaActiva(p, ahora) || p.ofertaHasta === null) return '';
-  return '<div class="cuenta ' + (clase || '') + '">Oferta termina en <b class="mono" data-hasta="' + p.ofertaHasta + '">' +
-         fmtCuenta(p.ofertaHasta - ahora) + '</b></div>';
+  const o = ofertaDe(p, ahora);
+  if(!o || o.hasta === null) return '';
+  return '<div class="cuenta ' + (clase || '') + '">Oferta termina en <b class="mono" data-hasta="' + o.hasta + '">' +
+         fmtCuenta(o.hasta - ahora) + '</b></div>';
 }
 
 /* ---------- Promociones automáticas ----------
@@ -790,7 +852,7 @@ function tarjetaHTML(e, ahora){
   else {
     if(e.newDrop) tags += '<span class="tag tag-drop">NEW DROP</span>';
     else if(e.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
-    if(oferta) tags += p.cyber ? '<span class="tag tag-cyber">CYBER WOW</span>' : '<span class="tag tag-oferta">Oferta</span>';
+    if(oferta) tags += (ofertaDe(p, ahora) || {}).campana ? '<span class="tag tag-cyber">' + esc(etiquetaCampana()) + '</span>' + (pctCampana(p, ahora) > 0 ? '<span class="tag-salto"></span><span class="tag tag-pct">-' + pctCampana(p, ahora) + '%</span>' : '') : '<span class="tag tag-oferta">Oferta</span>';
     const tmp = etiquetaTemp(p.nombre, ahora);
     if(tmp) tags += '<span class="tag tag-ultimo">' + esc(tmp) + '</span>';
     if(e.pocos) tags += '<span class="tag tag-pocos">' + (e.quedan ? textoQuedan(e.quedan, false) : 'Últimas unidades') + '</span>';
@@ -840,8 +902,13 @@ function promoVisible(pr, ahora){
   if(isNaN(pr.hasta)) return false;
   return ahora < pr.hasta + PROMO_GRACIA_MS;
 }
+// Con PROMOS_OCULTAR_AGOTADOS (config.js), un combo vigente que no se puede armar (algo agotado)
+// desaparece en vez de mostrar "Agotado: mira los otros combos".
+function comboOculto(x, ahora){
+  return !!cfg.PROMOS_OCULTAR_AGOTADOS && promoActiva(x.pr, ahora) && !estadoCombo(x, ahora).disponible;
+}
 function combosVisibles(ahora){
-  return PROMOS.map((pr, i) => ({pr: pr, i: i})).filter(x => x.pr.tipo === 'combo' && promoVisible(x.pr, ahora));
+  return PROMOS.map((pr, i) => ({pr: pr, i: i})).filter(x => x.pr.tipo === 'combo' && promoVisible(x.pr, ahora) && !comboOculto(x, ahora));
 }
 // Productos que entran en un casillero, en el orden en que están escritos.
 function opcionesCasillero(token){
@@ -956,8 +1023,9 @@ function renderCombo(){
   const ahora = Date.now();
   const body = document.getElementById('comboBody');
   const x = combosActivos(ahora).find(c => c.i === comboAbierto);
-  if(!x){
-    body.innerHTML = '<div class="sheet-pad"><h2>Promoción</h2><div class="estado">Esta promoción ya terminó.</div>' +
+  if(!x || comboOculto(x, ahora)){
+    // Combo que terminó, o que se agotó y está oculto (abierto por un link guardado).
+    body.innerHTML = '<div class="sheet-pad"><h2>Promoción</h2><div class="estado">' + (x ? 'Este combo ya no está disponible.' : 'Esta promoción ya terminó.') + '</div>' +
       '<button type="button" class="btn" data-cerrar>Ver el catálogo</button></div>';
     return;
   }
@@ -1092,7 +1160,7 @@ function renderHeroPromo(ahora){
   const combos = combosVisibles(ahora);
   if(!combos.length){
     el.innerHTML = enCampana
-      ? '<a class="hero-promo hero-cyber' + (ch.urgente ? ' hero-urgente' : '') + '" href="#catalogo" data-scroll="' + esc(ch.ir || 'cat-mas-vendidos') + '"><span class="hero-promo-titulo">' + esc(ch.titulo) + '</span>' +
+      ? '<a class="hero-promo hero-cyber' + (ch.urgente ? ' hero-urgente' : '') + (bfActivo(ahora) ? ' hero-pulso' : '') + '" href="#catalogo" data-scroll="' + esc(ch.ir || 'cat-mas-vendidos') + '"><span class="hero-promo-titulo">' + esc(ch.titulo) + '</span>' +
         '<span class="hero-promo-sub">' + esc(ch.sub) + ' · ' + esc(ch.boton) + '</span></a>'
       : '';
     return;
@@ -1106,6 +1174,88 @@ function renderHeroPromo(ahora){
   }
   el.innerHTML = '<a class="hero-promo" href="#promos" data-scroll="promos"><span class="hero-promo-titulo">' + esc(cfg.PROMOS_HERO || '🔥 Promos disponibles') + '</span>' +
     '<span class="hero-promo-sub">' + (cfg.PROMOS_HERO_SUB ? esc(cfg.PROMOS_HERO_SUB) + ' · ' : '') + (fines.length ? 'Hasta el ' + fechaCortaLima(Math.min.apply(null, fines)) + ' · ' : '') + 'Ver promos →</span></a>';
+}
+
+/* Botón "Ingresar código" del inicio (acceso anticipado al Black Friday) y su ventana. */
+function renderBotonCodigo(ahora){
+  const el = document.getElementById('heroCodigo');
+  if(!el) return;
+  el.innerHTML = botonCodigoVisible(ahora)
+    ? '<button type="button" class="hero-codigo" data-codigo-abrir><span class="hero-codigo-titulo">🔒 Ingresar código</span>' +
+      '<span class="hero-codigo-sub">Acceso anticipado al Black Friday</span></button>'
+    : '';
+}
+let codigoAbierto = false;
+const TEXTO_PEDIR_CODIGO = '¡Hola Timeless! Quiero el código de acceso anticipado al Black Friday 🖤';
+// Confeti corto (~1.5 s) hecho a mano: pocas piezas, colores de la marca, sin bloquear clics.
+// Con "reducir movimiento" activado en el celular no se muestra.
+function confeti(){
+  try {
+    if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  } catch(e) {}
+  const cont = document.createElement('div');
+  cont.className = 'confeti';
+  cont.setAttribute('aria-hidden', 'true');
+  const colores = ['#ffffff', '#2563eb', '#ef4444', '#8fa9ff'];
+  let h = '';
+  for(let i = 0; i < 36; i++){
+    h += '<i style="left:' + (Math.random() * 100).toFixed(1) + '%;background:' + colores[i % colores.length] +
+         ';--dx:' + Math.round((Math.random() - 0.5) * 160) + 'px;--giro:' + Math.round(Math.random() * 720 - 360) + 'deg' +
+         ';animation-delay:' + (Math.random() * 0.25).toFixed(2) + 's"></i>';
+  }
+  cont.innerHTML = h;
+  document.body.appendChild(cont);
+  setTimeout(() => { if(cont.parentNode) cont.parentNode.removeChild(cont); }, 1800);
+}
+function abrirCodigo(){
+  const ov = document.getElementById('codigoOverlay');
+  if(!ov) return;
+  document.getElementById('codigoBody').innerHTML =
+    '<div class="sheet-pad"><h2>Acceso anticipado</h2>' +
+    '<p class="codigo-txt">Escribe tu código para entrar al Black Friday antes que todos.</p>' +
+    '<form id="codigoForm" autocomplete="off"><input type="text" id="codigoInput" class="codigo-input" placeholder="Tu código" autocapitalize="characters" autocorrect="off" spellcheck="false" aria-label="Código de acceso anticipado">' +
+    '<button type="submit" class="btn btn-primario" style="width:100%;margin-top:10px">Entrar</button></form>' +
+    '<div id="codigoMsg" class="codigo-msg" role="status" aria-live="polite"></div>' +
+    // ¿No tienes código? Se pide por WhatsApp o Instagram (como en el carrito).
+    '<p class="codigo-pide">¿No tienes código? <button type="button" class="codigo-pide-btn" data-codigo-pide aria-expanded="false">Pregúntanos cómo</button></p>' +
+    '<div class="codigo-canales" id="codigoCanales" hidden>' +
+      '<a class="btn btn-wa" target="_blank" rel="noopener" href="' + esc(urlWhatsApp(TEXTO_PEDIR_CODIGO)) + '">WhatsApp</a>' +
+      '<button type="button" class="btn btn-ig" data-codigo-ig>Instagram</button></div></div>';
+  codigoAbierto = true;
+  ov.hidden = false;
+  bloquearFondo(true);
+  setTimeout(() => { const i = document.getElementById('codigoInput'); if(i) i.focus(); }, 50);
+}
+function cerrarCodigo(){
+  const ov = document.getElementById('codigoOverlay');
+  if(ov) ov.hidden = true;
+  codigoAbierto = false;
+  if(!document.querySelector('.overlay:not([hidden])')) bloquearFondo(false);
+}
+function probarCodigo(txt){
+  const msg = document.getElementById('codigoMsg');
+  if(!msg) return;
+  const ahora = Date.now(), ini = fechaAcceso('activaDesde');
+  msg.classList.remove('codigo-ok', 'codigo-mal');
+  if(!codigoValido(txt)){
+    msg.classList.add('codigo-mal');
+    msg.textContent = 'Código no válido. Escríbenos por DM para pedir tu acceso 🖤';
+    return;
+  }
+  if(ini !== null && ahora < ini){
+    // Código bueno pero todavía no es la hora: no se guarda ni se activa nada.
+    msg.classList.add('codigo-ok');
+    msg.textContent = 'El acceso anticipado todavía no está activo. Empieza el jueves 26 a las 12:00 a.m. Guarda tu código 🔒';
+    return;
+  }
+  vipGuardado = true;
+  try { localStorage.setItem(VIP_KEY, '1'); } catch(e) {}
+  document.getElementById('codigoBody').innerHTML =
+    '<div class="sheet-pad"><h2>¡Listo!</h2><div class="codigo-msg codigo-ok" role="status">¡Listo! Ya tienes acceso anticipado al Black Friday 🖤</div>' +
+    '<button type="button" class="btn btn-primario" style="width:100%;margin-top:14px" data-cerrar>Ver el catálogo</button></div>';
+  firmaOfertas = calcFirma(ahora);
+  renderTodo();
+  confeti();
 }
 
 /* Foto del inicio por fechas (config.js, HERO_FOTOS): cada campaña (Halloween, Cyber Wow…)
@@ -1162,6 +1312,7 @@ function renderGrilla(){
   const grupos = agrupar();
   renderHeroPromo(ahora);
   renderHeroDrop(ahora);
+  renderBotonCodigo(ahora);
   renderChipAviso();
   aplicarFotoInicio(ahora);
   document.body.classList.toggle('hay-promos', combosVisibles(ahora).length > 0);
@@ -1877,7 +2028,15 @@ function calcularPedido(ahora){
 function textoPedido(){
   const ped = calcularPedido(Date.now());
   const y = cfg.YAPE || {};
-  let t = '¡Hola Timeless! Quiero hacer este pedido:\n\n' +
+  // Black Friday: el pedido lo dice en la primera línea (con acceso anticipado antes del viernes 27).
+  const ahoraP = Date.now(), c = cfg.CAMPANA_PRECIOS || {};
+  const ini = parseFechaLima(c.desde), fin = parseFechaLima(c.hasta);
+  let tituloBF = '';
+  if(ini && fin && !isNaN(ini) && !isNaN(fin) && /black/i.test(c.etiqueta || '')){
+    if(ahoraP >= ini && ahoraP < fin) tituloBF = 'PEDIDO BLACK FRIDAY\n';
+    else if(ahoraP < ini && tieneAcceso(ahoraP)) tituloBF = 'PEDIDO ACCESO ANTICIPADO BLACK FRIDAY\n';
+  }
+  let t = tituloBF + '¡Hola Timeless! Quiero hacer este pedido:\n\n' +
     ped.lineas.map(l => l.combo
       // Combo: nombre de la promo, lo que eligió y el precio de la promo.
       ? '• ' + l.cant + ' × ' + l.combo.nombre + ' (' + l.ps.map(p => p.nombre).join(' + ') + ') — ' + fmtPrecio(l.unit) +
@@ -2001,10 +2160,11 @@ function renderFicha(indice){
             (v.disponible ? '' : (v.proximamente ? ' · Próximamente' : (v.restock ? ' · En camino' : ' · Agotado'))) + '</button>').join('') +
           '</div></div>'
         : '') +
-      (p.cyber && p.disponible && ofertaActiva(p, ahora)
-        ? '<div><span class="tag tag-cyber">CYBER WOW</span>' + (p.disponible && etiquetaTemp(p.nombre, ahora) ? ' <span class="tag tag-ultimo">' + esc(etiquetaTemp(p.nombre, ahora)) + '</span>' : '') + '</div>'
+      (p.disponible && (ofertaDe(p, ahora) || {}).campana
+        ? '<div><span class="tag tag-cyber">' + esc(etiquetaCampana()) + '</span>' + (p.disponible && etiquetaTemp(p.nombre, ahora) ? ' <span class="tag tag-ultimo">' + esc(etiquetaTemp(p.nombre, ahora)) + '</span>' : '') + '</div>'
         : '') +
-      '<div class="ficha-precios">' + preciosHTML(p, ahora) + '</div>' +
+      '<div class="ficha-precios">' + preciosHTML(p, ahora) +
+        (p.disponible && pctCampana(p, ahora) > 0 ? '<span class="tag tag-pct tag-pct-ficha">-' + pctCampana(p, ahora) + '%</span>' : '') + '</div>' +
       // Restock en camino: botón amarillo que baja al "Avísame".
       (p.restock ? '<button type="button" class="btn btn-restock" data-ir-aviso>Restock en camino · Te avisamos apenas llegue</button>' : '') +
       (p.disponible && p.pocos ? '<div class="pocos">' + (p.quedan ? textoQuedan(p.quedan, true) : 'Últimas unidades') + '</div>' : '') +
@@ -2665,13 +2825,14 @@ function ruta(){
   fichaOv.hidden = abierto !== fichaOv;
   carritoOv.hidden = abierto !== carritoOv;
   comboOv.hidden = abierto !== comboOv;
-  bloquearFondo(!!abierto);
+  bloquearFondo(!!abierto || codigoAbierto);
   if(abierto === fichaOv) renderFicha(indiceNuevo);
   if(abierto === carritoOv) renderCarrito();
   if(abierto === comboOv) renderCombo();
   if(abierto) abierto.querySelector('.sheet').scrollTop = 0;
 }
 function cerrarHoja(){
+  if(codigoAbierto){ cerrarCodigo(); return; }   // la ventana del código no usa el "#" de la dirección
   // Un combo abierto desde una ficha: la ✕ cierra TODO (para volver a la ficha
   // está la flecha "←"); si no, "cerrar" es lo mismo que "atrás".
   if(comboDesdeFicha && location.hash.indexOf('#/combo/') === 0){
@@ -2697,8 +2858,24 @@ window.addEventListener('hashchange', () => {
   ruta();
 });
 document.addEventListener('click', e => {
+  if(e.target.closest('[data-codigo-abrir]')){ abrirCodigo(); return; }
+  const pide = e.target.closest('[data-codigo-pide]');
+  if(pide){
+    const c = document.getElementById('codigoCanales');
+    if(c){ c.hidden = !c.hidden; pide.setAttribute('aria-expanded', String(!c.hidden)); }
+    return;
+  }
+  if(e.target.closest('[data-codigo-ig]')){
+    // Se copia el mensaje y se abre el chat en el mismo toque (Instagram no deja mandarlo escrito).
+    copiar(TEXTO_PEDIR_CODIGO).then(ok => toast(ok ? 'Mensaje copiado: pégalo en el chat' : 'Pídenos el código en el chat'));
+    window.open(urlInstagramChat(), '_blank', 'noopener');
+    return;
+  }
   // Cierra con la ✕, con un botón "seguir viendo" o tocando el fondo oscuro.
   if(e.target.closest('[data-cerrar]') || e.target.classList.contains('overlay')) cerrarHoja();
+});
+document.addEventListener('submit', e => {
+  if(e.target && e.target.id === 'codigoForm'){ e.preventDefault(); probarCodigo(document.getElementById('codigoInput').value); }
 });
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape' && document.body.classList.contains('sin-scroll')) cerrarHoja();
@@ -2733,6 +2910,7 @@ function calcFirma(ahora){
   return PRODUCTOS.map(p => ofertaActiva(p, ahora) ? '1' : '0').join('') + '|' +
          PROMOS.map(pr => (promoActiva(pr, ahora) ? '1' : '0') + (promoVisible(pr, ahora) ? '1' : '0')).join('') + '|' + (campanaHeroVigente(ahora) ? '1' : '0') +
          '|' + JSON.stringify(etapaDe(cfg.CAMPANA_HERO, ahora) || '') +
+         '|' + (botonCodigoVisible(ahora) ? '1' : '0') + (tieneAcceso(ahora) ? '1' : '0') +
          '|' + Object.keys(cfg.ETIQUETAS_TEMP || {}).map(n => etiquetaTemp(n, ahora) ? '1' : '0').join('');
 }
 setInterval(() => {
@@ -2744,6 +2922,8 @@ setInterval(() => {
   if(anuncio && !isNaN(anuncio) && CARGADA_EN < anuncio && ahora >= anuncio){ location.reload(); return; }
   // Llegó la hora de un lanzamiento: se recarga y el producto sale solo.
   if(PRODUCTOS.some(p => p.lanzamiento && ahora >= p.lanzamiento)) location.reload();
+  // Llegó la hora de un producto retenido (RETENER_HASTA): se recarga para que salga con su stock.
+  if(Object.keys(cfg.RETENER_HASTA || {}).some(n => { const t = retenidoHasta(n); return t && CARGADA_EN < t && ahora >= t; })) location.reload();
   aplicarFotoInicio(ahora);
   const firma = calcFirma(ahora);
   if(firma !== firmaOfertas){
