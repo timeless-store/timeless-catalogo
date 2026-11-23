@@ -241,7 +241,12 @@ const CATALOGO_CONFIG = {
 
   // Etiqueta roja temporal sobre un producto, solo entre sus fechas (hora de Lima).
   // Ejemplo: 'Cinturón Dark Knight': {texto: 'ÚLTIMO DÍA', desde: 'AAAA-MM-DD HH:MM', hasta: 'AAAA-MM-DD HH:MM'}
-  ETIQUETAS_TEMP: {},
+  ETIQUETAS_TEMP: {
+    // Volvieron las pant chains (llegaron el lunes 23-nov). Hasta antes del Black Friday para todos.
+    'Pant Chain Skeleton': {texto: 'VOLVIÓ', desde: '2026-11-23 00:00', hasta: '2026-11-27 00:00'},
+    'Pant Chain Spiderboy': {texto: 'VOLVIÓ', desde: '2026-11-23 00:00', hasta: '2026-11-27 00:00'},
+    'Pant Chain Y2K Pearls': {texto: 'VOLVIÓ', desde: '2026-11-23 00:00', hasta: '2026-11-27 00:00'},
+  },
 
   // Productos que NO muestran "Restock en camino" aunque el dashboard lo diga (salen como Agotado).
   SIN_AVISO_RESTOCK: [],
