@@ -246,6 +246,9 @@ const CATALOGO_CONFIG = {
     'Pant Chain Skeleton': {texto: 'VOLVIÓ', desde: '2026-11-23 00:00', hasta: '2026-11-27 00:00'},
     'Pant Chain Spiderboy': {texto: 'VOLVIÓ', desde: '2026-11-23 00:00', hasta: '2026-11-27 00:00'},
     'Pant Chain Y2K Pearls': {texto: 'VOLVIÓ', desde: '2026-11-23 00:00', hasta: '2026-11-27 00:00'},
+    // Volvieron los Iced Y2K (pedido de Shein, 23-nov).
+    'Cinturón Iced Silver Y2K': {texto: 'VOLVIÓ', desde: '2026-11-23 00:00', hasta: '2026-11-27 00:00'},
+    'Cinturón Iced Black Y2K': {texto: 'VOLVIÓ', desde: '2026-11-23 00:00', hasta: '2026-11-27 00:00'},
   },
 
   // Productos que NO muestran "Restock en camino" aunque el dashboard lo diga (salen como Agotado).
