@@ -249,18 +249,17 @@ const CATALOGO_CONFIG = {
     // Volvieron los Iced Y2K (pedido de Shein, 23-nov).
     'Cinturón Iced Silver Y2K': {texto: 'VOLVIÓ', desde: '2026-11-23 00:00', hasta: '2026-11-27 00:00'},
     'Cinturón Iced Black Y2K': {texto: 'VOLVIÓ', desde: '2026-11-23 00:00', hasta: '2026-11-27 00:00'},
+    // Volvió el Gothic Cross (24-nov).
+    'Collar Gothic Cross': {texto: 'VOLVIÓ', desde: '2026-11-24 00:00', hasta: '2026-11-27 00:00'},
   },
 
   // Productos que NO muestran "Restock en camino" aunque el dashboard lo diga (salen como Agotado).
   SIN_AVISO_RESTOCK: [],
 
   // Productos que NO salen como disponibles hasta esa hora (Lima), aunque el Excel ya tenga stock.
-  // Antes se ven como estaban (agotados). Collares Duki: salen el jueves 03/12 a las 6:00 pm, a
-  // precio normal (no están en el Black Friday). Pedido de Alberto el 21-nov-2026.
-  RETENER_HASTA: {
-    'Collar Ameri Duki': '2026-12-03 18:00',
-    'Collar Angel y Demon Wings Duki': '2026-12-03 18:00',
-  },
+  // Antes se ven como estaban (agotados). Ejemplo: 'Nombre exacto': 'AAAA-MM-DD HH:MM'.
+  // (24-nov: Alberto quitó la retención de los collares Duki; salen apenas haya stock, a precio normal.)
+  RETENER_HASTA: {},
 
   // Botoncito extra al inicio de los avisos del inicio (antes de "Puntos de recojo sin costo").
   // Sale solo hasta "hasta" y mientras el producto esté disponible.
