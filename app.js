@@ -786,7 +786,7 @@ function ordenSecciones(grupos){
   const conPant = hay('Pant chains') > 0;
   let lista = muchosCollares
     ? (conPant ? [C, T, P, A] : [C, T, A, P])
-    : (conPant ? [T, A, P, C] : [T, A, C, P]);
+    : (conPant ? [T, P, A, C] : [T, A, C, P]);
   // Las que no están en esta regla (Lentes, otras nuevas) van después, en el orden de CATEGORIAS.
   lista = lista.concat(fijo.filter(x => lista.indexOf(x) === -1));
   // Sin nada disponible: al final (sin cambiar el orden entre ellas).
